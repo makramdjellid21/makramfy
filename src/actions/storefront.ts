@@ -43,12 +43,14 @@ export async function getStoreProducts(organizationId: string) {
   });
 }
 
-// ─── جلب منتج واحد عبر slug ───────────────────────────────────────────────────
-export async function getStoreProduct(organizationId: string, slug: string) {
+// ─── جلب منتج واحد عبر المعرّف (id) ────────────────────────────────────────────
+// نعتمد الـ id بدل الـ slug في روابط المنتج لتفادي أي مشاكل ترميز محتملة
+// مع الروابط التي تحتوي أحرف عربية على بعض بيئات الاستضافة/الـ proxy.
+export async function getStoreProduct(organizationId: string, id: string) {
   return db.query.products.findFirst({
     where: and(
       eq(products.organizationId, organizationId),
-      eq(products.slug, slug),
+      eq(products.id, id),
       eq(products.isActive, true)
     ),
     with: { category: true, variants: true },

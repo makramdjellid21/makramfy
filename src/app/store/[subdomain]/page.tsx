@@ -182,7 +182,7 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
                 return (
                   <ProductCard
                     key={product.id}
-                    slug={product.slug}
+                    id={product.id}
                     name={product.name}
                     imageUrl={product.imageUrl}
                     priceCents={product.basePriceCents}
@@ -214,7 +214,7 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
               return (
                 <ProductCard
                   key={product.id}
-                  slug={product.slug}
+                  id={product.id}
                   name={product.name}
                   imageUrl={product.imageUrl}
                   priceCents={product.basePriceCents}

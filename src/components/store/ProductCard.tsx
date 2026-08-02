@@ -3,17 +3,17 @@ import { Package } from "lucide-react";
 import { formatDzd } from "@/lib/cart";
 
 interface ProductCardProps {
-  slug: string;
+  id: string;
   name: string;
   imageUrl: string | null;
   priceCents: number;
   inStock: boolean;
 }
 
-export function ProductCard({ slug, name, imageUrl, priceCents, inStock }: ProductCardProps) {
+export function ProductCard({ id, name, imageUrl, priceCents, inStock }: ProductCardProps) {
   return (
     <Link
-      href={`/product/${slug}`}
+      href={`/product/${id}`}
       className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg active:scale-[0.98] transition-all block touch-manipulation"
     >
       <div className="relative aspect-square">
