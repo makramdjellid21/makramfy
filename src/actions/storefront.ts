@@ -249,8 +249,8 @@ export async function createOrderPaymentCheckoutAction(
 ): Promise<ActionResult<{ url: string }>> {
   const result = await createChargilyCheckout({
     amount: Math.round(amountCents / 100),
-    successUrl: `http://${subdomain}.${ROOT_DOMAIN}/order-success?order=${orderId}`,
-    failureUrl: `http://${subdomain}.${ROOT_DOMAIN}/checkout?failed=1`,
+    successUrl: `https://${subdomain}.${ROOT_DOMAIN}/order-success?order=${orderId}`,
+    failureUrl: `https://${subdomain}.${ROOT_DOMAIN}/checkout?failed=1`,
     description: `طلب #${orderId.slice(0, 8)}`,
     metadata: { type: "order", orderId, organizationId },
   });
