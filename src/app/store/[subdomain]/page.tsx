@@ -2,16 +2,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getPublishedStore, getStoreProducts } from "@/actions/storefront";
 import { ProductCard } from "@/components/store/ProductCard";
+import { CategoryGrid } from "@/components/store/CategoryGrid";
+import { SearchBar } from "@/components/store/SearchBar";
 import { Package, Star } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ subdomain: string }>;
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; search?: string }>;
 }
 
 export default async function StoreHomePage({ params, searchParams }: PageProps) {
   const { subdomain } = await params;
-  const { category: activeCategorySlug } = await searchParams;
+  const { category: activeCategorySlug, search } = await searchParams;
 
   const store = await getPublishedStore(subdomain);
   if (!store) notFound();
@@ -28,9 +30,14 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
 
   const featuredProducts = productList.filter((p) => p.isFeatured);
 
-  const visibleProducts = activeCategorySlug
-    ? productList.filter((p) => p.category?.slug === activeCategorySlug)
-    : productList;
+  const searchTerm = search?.trim().toLowerCase();
+
+  let visibleProducts = productList;
+  if (searchTerm) {
+    visibleProducts = productList.filter((p) => p.name.toLowerCase().includes(searchTerm));
+  } else if (activeCategorySlug) {
+    visibleProducts = productList.filter((p) => p.category?.slug === activeCategorySlug);
+  }
 
   return (
     <div>
@@ -51,8 +58,12 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
       <div className="max-w-5xl mx-auto px-4 py-8">
         {settings.description && <p className="text-slate-600 text-sm mb-6 max-w-2xl">{settings.description}</p>}
 
+        <SearchBar themeColor={settings.themeColor} defaultValue={search ?? ""} />
+
+        {!searchTerm && <CategoryGrid categories={categoriesList} themeColor={settings.themeColor} />}
+
         {/* شريط التصنيفات */}
-        {categoriesList.length > 0 && (
+        {!searchTerm && categoriesList.length > 0 && (
           <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
             <Link
               href="/"
@@ -83,7 +94,7 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
         )}
 
         {/* منتجات مميزة */}
-        {featuredProducts.length > 0 && !activeCategorySlug && (
+        {featuredProducts.length > 0 && !activeCategorySlug && !searchTerm && (
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
               <Star size={16} style={{ color: settings.themeColor }} fill={settings.themeColor} />
@@ -108,7 +119,11 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
         )}
 
         <h2 className="text-lg font-bold text-slate-900 mb-4">
-          {activeCategorySlug ? categoriesMap.get(activeCategorySlug)?.name ?? "منتجاتنا" : "كل المنتجات"}
+          {searchTerm
+            ? `نتائج البحث عن "${search}"`
+            : activeCategorySlug
+              ? categoriesMap.get(activeCategorySlug)?.name ?? "منتجاتنا"
+              : "كل المنتجات"}
         </h2>
 
         {visibleProducts.length === 0 ? (

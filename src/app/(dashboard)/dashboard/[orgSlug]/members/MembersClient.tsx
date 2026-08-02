@@ -220,7 +220,7 @@ export function MembersClient({
                           onClick={() => handleRemove(member.userId)}
                         >
                           <Trash2 size={14} />
-                          إزالة من المنظمة
+                          إزالة من المتجر
                         </button>
                       )}
                     </div>

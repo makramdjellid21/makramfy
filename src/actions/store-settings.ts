@@ -39,7 +39,17 @@ export async function updateStoreSettingsAction(
   const bannerUrl = formData.get("bannerUrl") as string;
   const themeColor = (formData.get("themeColor") as string) || "#16a34a";
   const phone = (formData.get("phone") as string)?.trim();
+  const email = (formData.get("email") as string)?.trim();
   const address = (formData.get("address") as string)?.trim();
+  const announcementText = (formData.get("announcementText") as string)?.trim();
+  const socialInstagram = (formData.get("socialInstagram") as string)?.trim();
+  const socialFacebook = (formData.get("socialFacebook") as string)?.trim();
+  const socialTelegramChannel = (formData.get("socialTelegramChannel") as string)?.trim();
+  const socialWhatsapp = (formData.get("socialWhatsapp") as string)?.trim();
+  const aboutText = (formData.get("aboutText") as string)?.trim();
+  const returnPolicyText = (formData.get("returnPolicyText") as string)?.trim();
+  const privacyPolicyText = (formData.get("privacyPolicyText") as string)?.trim();
+  const termsText = (formData.get("termsText") as string)?.trim();
   const telegramBotToken = (formData.get("telegramBotToken") as string)?.trim();
   const telegramChatId = (formData.get("telegramChatId") as string)?.trim();
   const facebookPixelId = (formData.get("facebookPixelId") as string)?.trim();
@@ -54,7 +64,17 @@ export async function updateStoreSettingsAction(
     bannerUrl: bannerUrl || null,
     themeColor,
     phone: phone || null,
+    email: email || null,
     address: address || null,
+    announcementText: announcementText || null,
+    socialInstagram: socialInstagram || null,
+    socialFacebook: socialFacebook || null,
+    socialTelegramChannel: socialTelegramChannel || null,
+    socialWhatsapp: socialWhatsapp || null,
+    aboutText: aboutText || null,
+    returnPolicyText: returnPolicyText || null,
+    privacyPolicyText: privacyPolicyText || null,
+    termsText: termsText || null,
     telegramBotToken: telegramBotToken || null,
     telegramChatId: telegramChatId || null,
     facebookPixelId: facebookPixelId || null,

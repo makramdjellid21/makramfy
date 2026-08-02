@@ -119,7 +119,7 @@ export function DashboardSidebar({
           <Avatar name={currentOrg?.name} imageUrl={currentOrg?.logoUrl} size="sm" />
           <div className="flex-1 text-right min-w-0">
             <p className="text-sm font-medium text-slate-800 truncate">
-              {currentOrg?.name ?? "اختر منظمة"}
+              {currentOrg?.name ?? "اختر متجر"}
             </p>
             {currentOrg?.plan && (
               <Badge variant={planBadge[currentOrg.plan]?.variant ?? "default"}>
@@ -158,7 +158,7 @@ export function DashboardSidebar({
               className="flex items-center gap-3 px-3 py-2.5 text-violet-600 hover:bg-violet-50 transition-colors border-t border-slate-100"
             >
               <Plus size={16} />
-              <span className="text-sm">منظمة جديدة</span>
+              <span className="text-sm">متجر جديد</span>
             </Link>
           </div>
         )}
@@ -191,7 +191,7 @@ export function DashboardSidebar({
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-violet-600 hover:bg-violet-50 transition-colors"
           >
             <Plus size={18} />
-            إنشاء منظمة
+            إنشاء متجر
           </Link>
         )}
       </nav>

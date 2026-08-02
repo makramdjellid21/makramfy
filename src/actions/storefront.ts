@@ -55,6 +55,23 @@ export async function getStoreProduct(organizationId: string, slug: string) {
   });
 }
 
+// ─── تتبع الطلبات برقم الهاتف (صفحة عامة للزبون) ──────────────────────────────
+export async function getOrdersByPhone(organizationId: string, phone: string) {
+  const cleanPhone = phone.trim();
+  if (!cleanPhone) return [];
+
+  const customer = await db.query.customers.findFirst({
+    where: and(eq(customers.organizationId, organizationId), eq(customers.phone, cleanPhone)),
+  });
+  if (!customer) return [];
+
+  return db.query.orders.findMany({
+    where: eq(orders.customerId, customer.id),
+    with: { items: true },
+    orderBy: (o, { desc }) => desc(o.createdAt),
+  });
+}
+
 // ─── جلب طلب واحد (لصفحة تأكيد الدفع بعد Chargily) ────────────────────────────
 export async function getOrderById(organizationId: string, orderId: string) {
   return db.query.orders.findFirst({

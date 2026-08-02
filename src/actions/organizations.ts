@@ -59,7 +59,7 @@ export async function createOrganizationAction(
   const name = (formData.get("name") as string)?.trim();
 
   if (!name || name.length < 2) {
-    return { success: false, error: "اسم المنظمة يجب أن يكون حرفين على الأقل" };
+    return { success: false, error: "اسم المتجر يجب أن يكون حرفين على الأقل" };
   }
 
   const baseSlug = generateSlug(name);
@@ -151,7 +151,7 @@ export async function getOrgMembers(orgSlug: string) {
     .from(organizations)
     .where(eq(organizations.slug, orgSlug));
 
-  if (!org) throw new Error("المنظمة غير موجودة");
+  if (!org) throw new Error("المتجر غير موجود");
 
   const membership = await getMembership(user.id, org.id);
   if (!membership) throw new Error("FORBIDDEN");
@@ -209,7 +209,7 @@ export async function inviteMemberAction(
     .where(eq(memberships.organizationId, orgId));
 
   if (existingMembership.length > 0) {
-    return { success: false, error: "هذا المستخدم عضو بالفعل في المنظمة" };
+    return { success: false, error: "هذا المستخدم عضو بالفعل في المتجر" };
   }
 
   // Check for existing invite
@@ -260,7 +260,7 @@ export async function acceptInvitationAction(token: string): Promise<ActionResul
     return { success: false, error: "هذه الدعوة مخصصة لبريد إلكتروني آخر" };
 
   const existing = await getMembership(user.id, invite.organizationId);
-  if (existing) return { success: false, error: "أنت عضو بالفعل في هذه المنظمة" };
+  if (existing) return { success: false, error: "أنت عضو بالفعل في هذا المتجر" };
 
   await db.insert(memberships).values({
     id: generateId(),
@@ -297,7 +297,7 @@ export async function removeMemberAction(
 
   // Cannot remove an owner
   if (targetMembership.role === "OWNER") {
-    return { success: false, error: "لا يمكن إزالة المالك من المنظمة" };
+    return { success: false, error: "لا يمكن إزالة المالك من المتجر" };
   }
 
   await db
@@ -348,7 +348,7 @@ export async function changeMemberRoleAction(
     if (ownerCount <= 1) {
       return {
         success: false,
-        error: "يجب أن يكون للمنظمة مالك واحد على الأقل. انقل الملكية أولاً.",
+        error: "يجب أن يكون للمتجر مالك واحد على الأقل. انقل الملكية أولاً.",
       };
     }
   }

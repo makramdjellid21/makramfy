@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
 import { ImageUploader } from "@/components/ImageUploader";
 import { updateOrganizationAction, deleteOrganizationAction } from "@/actions/organizations";
-import { updateStoreSettingsAction, toggleStorePublishedAction, testTelegramNotificationAction } from "@/actions/store-settings";
+import {
+  updateStoreSettingsAction,
+  toggleStorePublishedAction,
+  testTelegramNotificationAction,
+} from "@/actions/store-settings";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { ExternalLink, Globe, Send, BarChart3 } from "lucide-react";
+import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText } from "lucide-react";
 
 interface Org {
   id: string;
@@ -24,7 +28,17 @@ interface Settings {
   bannerUrl: string | null;
   themeColor: string;
   phone: string | null;
+  email: string | null;
   address: string | null;
+  announcementText: string | null;
+  socialInstagram: string | null;
+  socialFacebook: string | null;
+  socialTelegramChannel: string | null;
+  socialWhatsapp: string | null;
+  aboutText: string | null;
+  returnPolicyText: string | null;
+  privacyPolicyText: string | null;
+  termsText: string | null;
   telegramBotToken: string | null;
   telegramChatId: string | null;
   facebookPixelId: string | null;
@@ -45,24 +59,68 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
   const [name, setName] = useState(org.name);
   const [logoUrl, setLogoUrl] = useState(org.logoUrl ?? "");
+
   const [description, setDescription] = useState(settings?.description ?? "");
   const [bannerUrl, setBannerUrl] = useState(settings?.bannerUrl ?? "");
   const [themeColor, setThemeColor] = useState(settings?.themeColor ?? "#16a34a");
   const [phone, setPhone] = useState(settings?.phone ?? "");
+  const [email, setEmail] = useState(settings?.email ?? "");
   const [address, setAddress] = useState(settings?.address ?? "");
-  const [isPublished, setIsPublished] = useState(settings?.isPublished ?? false);
+  const [announcementText, setAnnouncementText] = useState(settings?.announcementText ?? "");
+  const [socialInstagram, setSocialInstagram] = useState(settings?.socialInstagram ?? "");
+  const [socialFacebook, setSocialFacebook] = useState(settings?.socialFacebook ?? "");
+  const [socialTelegramChannel, setSocialTelegramChannel] = useState(settings?.socialTelegramChannel ?? "");
+  const [socialWhatsapp, setSocialWhatsapp] = useState(settings?.socialWhatsapp ?? "");
+  const [aboutText, setAboutText] = useState(settings?.aboutText ?? "");
+  const [returnPolicyText, setReturnPolicyText] = useState(settings?.returnPolicyText ?? "");
+  const [privacyPolicyText, setPrivacyPolicyText] = useState(settings?.privacyPolicyText ?? "");
+  const [termsText, setTermsText] = useState(settings?.termsText ?? "");
   const [telegramBotToken, setTelegramBotToken] = useState(settings?.telegramBotToken ?? "");
   const [telegramChatId, setTelegramChatId] = useState(settings?.telegramChatId ?? "");
   const [facebookPixelId, setFacebookPixelId] = useState(settings?.facebookPixelId ?? "");
+  const [isPublished, setIsPublished] = useState(settings?.isPublished ?? false);
 
   const [savingGeneral, setSavingGeneral] = useState(false);
-  const [savingStore, setSavingStore] = useState(false);
-  const [savingMarketing, setSavingMarketing] = useState(false);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [testingTelegram, setTestingTelegram] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // كل حقول storeSettings تُحفظ مع بعض دائمًا (نفس الصف بقاعدة البيانات)، بغض النظر عن أي زر ضُغط
+  function buildFormData() {
+    const formData = new FormData();
+    formData.set("description", description.trim());
+    formData.set("bannerUrl", bannerUrl);
+    formData.set("themeColor", themeColor);
+    formData.set("phone", phone.trim());
+    formData.set("email", email.trim());
+    formData.set("address", address.trim());
+    formData.set("announcementText", announcementText.trim());
+    formData.set("socialInstagram", socialInstagram.trim());
+    formData.set("socialFacebook", socialFacebook.trim());
+    formData.set("socialTelegramChannel", socialTelegramChannel.trim());
+    formData.set("socialWhatsapp", socialWhatsapp.trim());
+    formData.set("aboutText", aboutText.trim());
+    formData.set("returnPolicyText", returnPolicyText.trim());
+    formData.set("privacyPolicyText", privacyPolicyText.trim());
+    formData.set("termsText", termsText.trim());
+    formData.set("telegramBotToken", telegramBotToken.trim());
+    formData.set("telegramChatId", telegramChatId.trim());
+    formData.set("facebookPixelId", facebookPixelId.trim());
+    return formData;
+  }
+
+  async function handleSaveSection(section: string, successMsg: string) {
+    setSavingSection(section);
+    setError("");
+    setSuccess("");
+    const result = await updateStoreSettingsAction(orgId, buildFormData());
+    setSavingSection(null);
+    if (!result.success) setError(result.error);
+    else setSuccess(successMsg);
+  }
 
   async function handleSaveGeneral() {
     setSavingGeneral(true);
@@ -75,44 +133,6 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
     setSavingGeneral(false);
     if (!result.success) setError(result.error);
     else setSuccess("تم حفظ المعلومات العامة");
-  }
-
-  async function handleSaveStore() {
-    setSavingStore(true);
-    setError("");
-    setSuccess("");
-    const formData = new FormData();
-    formData.set("description", description.trim());
-    formData.set("bannerUrl", bannerUrl);
-    formData.set("themeColor", themeColor);
-    formData.set("phone", phone.trim());
-    formData.set("address", address.trim());
-    formData.set("telegramBotToken", telegramBotToken.trim());
-    formData.set("telegramChatId", telegramChatId.trim());
-    formData.set("facebookPixelId", facebookPixelId.trim());
-    const result = await updateStoreSettingsAction(orgId, formData);
-    setSavingStore(false);
-    if (!result.success) setError(result.error);
-    else setSuccess("تم حفظ إعدادات المتجر");
-  }
-
-  async function handleSaveMarketing() {
-    setSavingMarketing(true);
-    setError("");
-    setSuccess("");
-    const formData = new FormData();
-    formData.set("description", description.trim());
-    formData.set("bannerUrl", bannerUrl);
-    formData.set("themeColor", themeColor);
-    formData.set("phone", phone.trim());
-    formData.set("address", address.trim());
-    formData.set("telegramBotToken", telegramBotToken.trim());
-    formData.set("telegramChatId", telegramChatId.trim());
-    formData.set("facebookPixelId", facebookPixelId.trim());
-    const result = await updateStoreSettingsAction(orgId, formData);
-    setSavingMarketing(false);
-    if (!result.success) setError(result.error);
-    else setSuccess("تم حفظ إعدادات التسويق");
   }
 
   async function handleTestTelegram() {
@@ -244,13 +264,118 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label="رقم الهاتف" placeholder="0555 xx xx xx" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canEdit} />
-          <Input label="العنوان" placeholder="المدينة، الولاية" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canEdit} />
+          <Input label="رقم الهاتف" placeholder="0555 xx xx xx" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!canEdit} dir="ltr" />
+          <Input label="البريد الإلكتروني" placeholder="contact@store.com" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!canEdit} dir="ltr" />
+        </div>
+        <Input label="العنوان" placeholder="المدينة، الولاية" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!canEdit} />
+
+        {canEdit && (
+          <Button onClick={() => handleSaveSection("store", "تم حفظ إعدادات المتجر")} loading={savingSection === "store"}>
+            حفظ إعدادات المتجر
+          </Button>
+        )}
+      </div>
+
+      {/* الإعلان الترويجي */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Megaphone size={18} className="text-amber-500" />
+          <h2 className="text-lg font-semibold text-slate-900">الإعلان الترويجي</h2>
+        </div>
+        <p className="text-xs text-slate-500">
+          شريط قصير يظهر بأعلى متجرك لكل الزبائن، مثال: &quot;شحن مجاني فوق 3000 د.ج&quot;
+        </p>
+        <Input
+          placeholder="شحن مجاني لجميع الطلبات فوق 3000 د.ج"
+          value={announcementText}
+          onChange={(e) => setAnnouncementText(e.target.value)}
+          disabled={!canEdit}
+        />
+        {canEdit && (
+          <Button onClick={() => handleSaveSection("announcement", "تم حفظ الإعلان")} loading={savingSection === "announcement"}>
+            حفظ
+          </Button>
+        )}
+      </div>
+
+      {/* روابط التواصل الاجتماعي */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-slate-900">روابط التواصل الاجتماعي</h2>
+        <p className="text-xs text-slate-500">تظهر كأيقونات بالقائمة الجانبية لمتجرك — اختياري</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="رقم واتساب"
+            placeholder="0555xxxxxx"
+            value={socialWhatsapp}
+            onChange={(e) => setSocialWhatsapp(e.target.value)}
+            disabled={!canEdit}
+            dir="ltr"
+          />
+          <Input
+            label="رابط قناة تيليجرام"
+            placeholder="https://t.me/yourstore"
+            value={socialTelegramChannel}
+            onChange={(e) => setSocialTelegramChannel(e.target.value)}
+            disabled={!canEdit}
+            dir="ltr"
+          />
+          <Input
+            label="رابط إنستغرام"
+            placeholder="https://instagram.com/yourstore"
+            value={socialInstagram}
+            onChange={(e) => setSocialInstagram(e.target.value)}
+            disabled={!canEdit}
+            dir="ltr"
+          />
+          <Input
+            label="رابط فيسبوك"
+            placeholder="https://facebook.com/yourstore"
+            value={socialFacebook}
+            onChange={(e) => setSocialFacebook(e.target.value)}
+            disabled={!canEdit}
+            dir="ltr"
+          />
         </div>
 
         {canEdit && (
-          <Button onClick={handleSaveStore} loading={savingStore}>
-            حفظ إعدادات المتجر
+          <Button onClick={() => handleSaveSection("social", "تم حفظ روابط التواصل")} loading={savingSection === "social"}>
+            حفظ
+          </Button>
+        )}
+      </div>
+
+      {/* الصفحات القانونية */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText size={18} className="text-slate-500" />
+          <h2 className="text-lg font-semibold text-slate-900">الصفحات القانونية</h2>
+        </div>
+        <p className="text-xs text-slate-500">
+          اختياري — إذا تركتها فاضية، متجرك بيعرض نص عام افتراضي بدلها
+        </p>
+
+        {[
+          { label: "من نحن", value: aboutText, setValue: setAboutText },
+          { label: "سياسة الإرجاع", value: returnPolicyText, setValue: setReturnPolicyText },
+          { label: "سياسة الخصوصية", value: privacyPolicyText, setValue: setPrivacyPolicyText },
+          { label: "شروط الاستخدام", value: termsText, setValue: setTermsText },
+        ].map((field) => (
+          <div key={field.label}>
+            <label className="text-sm font-medium text-slate-700 block mb-1">{field.label}</label>
+            <textarea
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+              rows={3}
+              value={field.value}
+              onChange={(e) => field.setValue(e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+        ))}
+
+        {canEdit && (
+          <Button onClick={() => handleSaveSection("legal", "تم حفظ الصفحات القانونية")} loading={savingSection === "legal"}>
+            حفظ
           </Button>
         )}
       </div>
@@ -320,7 +445,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
         </div>
 
         {canEdit && (
-          <Button onClick={handleSaveMarketing} loading={savingMarketing}>
+          <Button onClick={() => handleSaveSection("marketing", "تم حفظ إعدادات التسويق")} loading={savingSection === "marketing"}>
             حفظ إعدادات التسويق
           </Button>
         )}

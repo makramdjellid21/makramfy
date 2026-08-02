@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { createOrganizationAction } from "@/actions/organizations";
-import { Building2 } from "lucide-react";
+import { Store } from "lucide-react";
 
 export default function NewOrganizationPage() {
   const router = useRouter();
@@ -36,11 +36,11 @@ export default function NewOrganizationPage() {
     <div className="max-w-lg mx-auto">
       <div className="text-center mb-8">
         <div className="h-16 w-16 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
-          <Building2 size={28} className="text-violet-600" />
+          <Store size={28} className="text-violet-600" />
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">إنشاء منظمة جديدة</h1>
+        <h1 className="text-2xl font-bold text-slate-900">إنشاء متجر جديد</h1>
         <p className="text-slate-500 text-sm mt-2">
-          ستكون أول مالك للمنظمة وتستطيع دعوة أعضاء لاحقاً.
+          ستكون أول مالك لهذا المتجر وتستطيع دعوة أعضاء لاحقاً.
         </p>
       </div>
 
@@ -53,16 +53,16 @@ export default function NewOrganizationPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <Input
-            label="اسم المنظمة"
+            label="اسم المتجر"
             name="name"
             type="text"
-            placeholder="شركتي / فريقي"
+            placeholder="متجر أحذية مثلاً"
             required
-            hint="سيتم إنشاء رابط فريد تلقائياً بناءً على الاسم"
+            hint="سيتم إنشاء رابط فريد لمتجرك تلقائياً بناءً على الاسم"
           />
 
           <Button type="submit" className="w-full" loading={loading} size="lg">
-            إنشاء المنظمة
+            إنشاء المتجر
           </Button>
         </form>
       </div>
