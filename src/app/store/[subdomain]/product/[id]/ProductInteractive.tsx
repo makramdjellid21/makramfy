@@ -20,6 +20,7 @@ interface ProductInteractiveProps {
   subdomain: string;
   productId: string;
   name: string;
+  categoryName: string | null;
   slug: string;
   basePriceCents: number;
   imageUrl: string | null;
@@ -32,6 +33,7 @@ export function ProductInteractive({
   subdomain,
   productId,
   name,
+  categoryName,
   slug,
   basePriceCents,
   imageUrl,
@@ -125,7 +127,8 @@ export function ProductInteractive({
 
       {/* التفاصيل والشراء */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{name}</h1>
+        {categoryName && <span className="text-xs text-slate-400">{categoryName}</span>}
+        <h1 className="text-2xl font-bold text-slate-900 mt-1">{name}</h1>
         <p className="text-2xl font-bold mt-3" style={{ color: themeColor }}>
           {formatDzd(priceCents)}
         </p>

@@ -55,7 +55,9 @@ export function CheckoutForm({ subdomain, organizationId, themeColor }: Checkout
         <h1 className="text-lg font-bold text-slate-900 mb-2">تم استلام طلبك!</h1>
         <p className="text-slate-500 text-sm mb-2">راح يتواصل معك صاحب المتجر قريبًا لتأكيد التوصيل.</p>
         <p className="text-slate-800 font-bold mb-6">{formatDzd(orderTotal)}</p>
-        <Button onClick={() => router.push("/")}>رجوع للمتجر</Button>
+        <Button onClick={() => router.push("/")} style={{ backgroundColor: themeColor }}>
+          رجوع للمتجر
+        </Button>
       </div>
     );
   }
@@ -276,7 +278,7 @@ export function CheckoutForm({ subdomain, organizationId, themeColor }: Checkout
         </div>
       </div>
 
-      <Button className="w-full" size="lg" onClick={handleSubmit} loading={loading}>
+      <Button className="w-full" size="lg" onClick={handleSubmit} loading={loading} style={{ backgroundColor: themeColor }}>
         {paymentMethod === "online" ? "المتابعة للدفع" : "تأكيد الطلب"}
       </Button>
     </div>

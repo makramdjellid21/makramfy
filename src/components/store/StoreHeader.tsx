@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { getCategoryIcon } from "@/lib/categoryIcons";
+import { CartPanel } from "@/components/store/CartPanel";
 
 // lucide-react removed the brand icons (Facebook, Instagram) from its exports,
 // so these are small inline replacements with the same `size` prop signature.
@@ -100,6 +101,7 @@ export function StoreHeader({
 }: StoreHeaderProps) {
   const { count, ready } = useCart(subdomain);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const socials = [
     socialWhatsapp && { icon: MessageCircle, href: `https://wa.me/${socialWhatsapp.replace(/\D/g, "")}` },
@@ -152,9 +154,10 @@ export function StoreHeader({
             <span className="font-bold text-slate-900 truncate">{storeName}</span>
           </Link>
 
-          <Link
-            href="/cart"
+          <button
+            onClick={() => setCartOpen(true)}
             className="relative flex items-center justify-center h-10 w-10 rounded-xl hover:bg-slate-50 transition-colors shrink-0"
+            aria-label="السلة"
           >
             <ShoppingCart size={20} className="text-slate-700" />
             {ready && count > 0 && (
@@ -165,7 +168,7 @@ export function StoreHeader({
                 {count > 9 ? "9+" : count}
               </span>
             )}
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -295,6 +298,25 @@ export function StoreHeader({
                 <p className="text-xs text-slate-400">لكل ولايات الجزائر خلال أيام معدودة</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* سلة المشتريات (Drawer) */}
+      {cartOpen && (
+        <div className="fixed inset-0 z-30">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setCartOpen(false)} />
+          <div className="absolute top-0 left-0 h-full w-96 max-w-[90vw] bg-white overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-100 px-4 py-3.5 flex items-center justify-between z-10">
+              <h2 className="font-bold text-slate-900">سلة المشتريات</h2>
+              <button
+                onClick={() => setCartOpen(false)}
+                className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-slate-100"
+              >
+                <X size={18} className="text-slate-600" />
+              </button>
+            </div>
+            <CartPanel subdomain={subdomain} themeColor={themeColor} onNavigate={() => setCartOpen(false)} />
           </div>
         </div>
       )}

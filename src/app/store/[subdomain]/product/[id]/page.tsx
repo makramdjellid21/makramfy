@@ -28,13 +28,12 @@ export default async function ProductPage({ params }: PageProps) {
         رجوع للمتجر
       </Link>
 
-      {product.category && <span className="text-xs text-slate-400">{product.category.name}</span>}
-
-      <div className="mt-2">
+      <div>
         <ProductInteractive
           subdomain={subdomain}
           productId={product.id}
           name={product.name}
+          categoryName={product.category?.name ?? null}
           slug={product.slug}
           basePriceCents={product.basePriceCents}
           imageUrl={product.imageUrl}

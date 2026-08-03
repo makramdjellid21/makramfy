@@ -3,6 +3,7 @@ import { getPublishedStore, getStoreProducts } from "@/actions/storefront";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { StoreFooter } from "@/components/store/StoreFooter";
 import { FacebookPixel } from "@/components/store/FacebookPixel";
+import { StoreThemeProvider } from "@/hooks/useStoreTheme";
 
 export default async function StoreLayout({
   children,
@@ -27,26 +28,28 @@ export default async function StoreLayout({
   const categoriesList = Array.from(categoriesMap.values());
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 flex flex-col" style={{ ["--store-color" as string]: settings.themeColor }}>
-      <FacebookPixel pixelId={settings.facebookPixelId} />
-      <StoreHeader
-        subdomain={subdomain}
-        storeName={org.name}
-        description={settings.description}
-        logoUrl={org.logoUrl}
-        themeColor={settings.themeColor}
-        announcementText={settings.announcementText}
-        phone={settings.phone}
-        email={settings.email}
-        address={settings.address}
-        socialInstagram={settings.socialInstagram}
-        socialFacebook={settings.socialFacebook}
-        socialTelegramChannel={settings.socialTelegramChannel}
-        socialWhatsapp={settings.socialWhatsapp}
-        categories={categoriesList}
-      />
-      <main className="flex-1">{children}</main>
-      <StoreFooter storeName={org.name} />
-    </div>
+    <StoreThemeProvider color={settings.themeColor}>
+      <div dir="rtl" className="min-h-screen bg-slate-50 flex flex-col" style={{ ["--store-color" as string]: settings.themeColor }}>
+        <FacebookPixel pixelId={settings.facebookPixelId} />
+        <StoreHeader
+          subdomain={subdomain}
+          storeName={org.name}
+          description={settings.description}
+          logoUrl={org.logoUrl}
+          themeColor={settings.themeColor}
+          announcementText={settings.announcementText}
+          phone={settings.phone}
+          email={settings.email}
+          address={settings.address}
+          socialInstagram={settings.socialInstagram}
+          socialFacebook={settings.socialFacebook}
+          socialTelegramChannel={settings.socialTelegramChannel}
+          socialWhatsapp={settings.socialWhatsapp}
+          categories={categoriesList}
+        />
+        <main className="flex-1">{children}</main>
+        <StoreFooter storeName={org.name} />
+      </div>
+    </StoreThemeProvider>
   );
 }
