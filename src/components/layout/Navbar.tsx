@@ -5,8 +5,14 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
-export function Navbar() {
+interface NavbarProps {
+  isLoggedIn: boolean;
+}
+
+export function Navbar({ isLoggedIn }: NavbarProps) {
   const [open, setOpen] = useState(false);
+  const ctaHref = isLoggedIn ? "/dashboard" : "/register";
+  const ctaLabel = isLoggedIn ? "الذهاب للوحة التحكم" : "ابدأ مجاناً";
 
   return (
     <nav className="sticky top-0 z-40 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
@@ -24,11 +30,13 @@ export function Navbar() {
             <Link href="/pricing" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
               الأسعار
             </Link>
-            <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
-              تسجيل الدخول
-            </Link>
-            <Link href="/register">
-              <Button size="sm">ابدأ مجاناً</Button>
+            {!isLoggedIn && (
+              <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">
+                تسجيل الدخول
+              </Link>
+            )}
+            <Link href={ctaHref}>
+              <Button size="sm">{ctaLabel}</Button>
             </Link>
           </div>
 
@@ -43,9 +51,11 @@ export function Navbar() {
         {open && (
           <div className="md:hidden py-4 space-y-3 border-t border-slate-100">
             <Link href="/pricing" className="block text-sm text-slate-600 py-2">الأسعار</Link>
-            <Link href="/login" className="block text-sm text-slate-600 py-2">تسجيل الدخول</Link>
-            <Link href="/register">
-              <Button size="sm" className="w-full">ابدأ مجاناً</Button>
+            {!isLoggedIn && (
+              <Link href="/login" className="block text-sm text-slate-600 py-2">تسجيل الدخول</Link>
+            )}
+            <Link href={ctaHref}>
+              <Button size="sm" className="w-full">{ctaLabel}</Button>
             </Link>
           </div>
         )}

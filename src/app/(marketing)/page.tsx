@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { ArrowLeft, Check, Store, CreditCard, Palette, Package, Globe, Truck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const user = await getCurrentUser();
+  const ctaHref = user ? "/dashboard" : "/register";
+  const heroCtaLabel = user ? "الذهاب للوحة التحكم" : "أنشئ متجرك مجاناً";
+  const bottomCtaLabel = user ? "الذهاب للوحة التحكم" : "أنشئ متجرك الآن";
+
   const features = [
     {
       icon: Store,
@@ -68,9 +74,9 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/register">
+              <Link href={ctaHref}>
                 <Button size="lg" className="bg-white text-violet-700 hover:bg-violet-50 font-bold px-8">
-                  أنشئ متجرك مجاناً
+                  {heroCtaLabel}
                   <ArrowLeft size={18} />
                 </Button>
               </Link>
@@ -147,9 +153,9 @@ export default function LandingPage() {
             انضم للتجار اللي فتحوا متاجرهم على MakramFy وبدأوا يبيعوا بلا تعقيد.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/register">
+            <Link href={ctaHref}>
               <Button size="lg" className="bg-white text-violet-700 hover:bg-violet-50 font-bold px-8">
-                أنشئ متجرك الآن
+                {bottomCtaLabel}
               </Button>
             </Link>
           </div>

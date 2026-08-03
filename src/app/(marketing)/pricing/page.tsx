@@ -3,8 +3,12 @@ import { Check, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { formatBytes } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const user = await getCurrentUser();
+  const ctaHref = user ? "/dashboard" : "/register";
+
   const plans = [
     {
       key: "free",
@@ -137,7 +141,7 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <Link href="/register">
+              <Link href={ctaHref}>
                 <Button
                   size="lg"
                   className={`w-full ${
@@ -149,7 +153,7 @@ export default function PricingPage() {
                   }`}
                   variant={plan.popular ? "secondary" : "primary"}
                 >
-                  {plan.price === 0 ? "ابدأ مجاناً" : "ابدأ الآن"}
+                  {user ? "الذهاب للوحة التحكم" : plan.price === 0 ? "ابدأ مجاناً" : "ابدأ الآن"}
                 </Button>
               </Link>
             </div>

@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
 import { Navbar } from "@/components/layout/Navbar";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function MarketingLayout({ children }: { children: ReactNode }) {
+export default async function MarketingLayout({ children }: { children: ReactNode }) {
+  const user = await getCurrentUser();
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      <Navbar isLoggedIn={Boolean(user)} />
       <main className="flex-1">{children}</main>
       <footer className="bg-slate-900 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

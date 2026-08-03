@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { registerAction } from "@/actions/auth";
+import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { Check } from "lucide-react";
 
 export default function RegisterPage() {
@@ -110,6 +111,20 @@ export default function RegisterPage() {
             إنشاء الحساب
           </Button>
         </form>
+
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-slate-100" />
+          <span className="text-xs text-slate-400">أو</span>
+          <div className="flex-1 h-px bg-slate-100" />
+        </div>
+
+        <a
+          href="/api/auth/google"
+          className="w-full flex items-center justify-center gap-2 border border-slate-200 rounded-xl py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          <GoogleIcon />
+          التسجيل عبر جوجل
+        </a>
 
         <p className="text-center text-sm text-slate-500 mt-6">
           لديك حساب بالفعل؟{" "}

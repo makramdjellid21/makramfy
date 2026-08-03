@@ -58,6 +58,18 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Password Reset Tokens ─────────────────────────────────────────────────────
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── Organizations ────────────────────────────────────────────────────────────
 export const organizations = pgTable(
   "organizations",

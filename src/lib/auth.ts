@@ -1,8 +1,9 @@
 import { db } from "@/db";
-import { users, sessions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, sessions, passwordResetTokens } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { generateId } from "./utils";
 
 const SESSION_COOKIE = "makramfy_session";
@@ -84,4 +85,45 @@ export async function requireAuth() {
 
 export async function deleteSession(sessionId: string) {
   await db.delete(sessions).where(eq(sessions.id, sessionId));
+}
+
+// ─── إعادة تعيين كلمة المرور ────────────────────────────────────────────────────
+const RESET_TOKEN_EXPIRY_MINUTES = 60;
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** ينشئ رمز إعادة تعيين عشوائي، يخزّن نسخته المجزّأة فقط في قاعدة البيانات، ويعيد الرمز الأصلي لإرساله بالإيميل. */
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+  await db.insert(passwordResetTokens).values({
+    id: generateId(),
+    userId,
+    tokenHash: hashToken(rawToken),
+    expiresAt,
+  });
+
+  return rawToken;
+}
+
+/** يتحقق من صلاحية الرمز ويعيد userId إن كان صالحًا وغير مستخدم من قبل. */
+export async function verifyPasswordResetToken(rawToken: string): Promise<{ id: string; userId: string } | null> {
+  const tokenHash = hashToken(rawToken);
+
+  const [record] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt)));
+
+  if (!record) return null;
+  if (record.expiresAt < new Date()) return null;
+
+  return { id: record.id, userId: record.userId };
+}
+
+export async function markPasswordResetTokenUsed(id: string) {
+  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, id));
 }

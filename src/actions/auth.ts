@@ -13,7 +13,11 @@ import {
   clearSessionCookie,
   getSession,
   deleteSession,
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+  markPasswordResetTokenUsed,
 } from "@/lib/auth";
+import { sendPasswordResetEmail } from "@/lib/email";
 import { generateId } from "@/lib/utils";
 
 const registerSchema = z.object({
@@ -121,6 +125,58 @@ export async function updateProfileAction(formData: FormData): Promise<ActionRes
     .update(users)
     .set({ name: name.trim(), imageUrl: imageUrl || null, updatedAt: new Date() })
     .where(eq(users.id, session.userId));
+
+  return { success: true, data: undefined };
+}
+
+// ─── إعادة تعيين كلمة المرور ────────────────────────────────────────────────────
+const forgotPasswordSchema = z.object({
+  email: z.string().email("البريد الإلكتروني غير صحيح"),
+});
+
+export async function requestPasswordResetAction(formData: FormData): Promise<ActionResult> {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") as string });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "خطأ في البيانات" };
+  }
+
+  const { email } = parsed.data;
+  const [user] = await db.select().from(users).where(eq(users.email, email));
+
+  // لا نكشف إن كان الإيميل موجودًا أو لا (لأسباب أمنية) — نرجّع نجاح دائمًا
+  if (user && user.passwordHash) {
+    const token = await createPasswordResetToken(user.id);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const resetUrl = `${appUrl}/reset-password?token=${token}`;
+    await sendPasswordResetEmail(email, resetUrl);
+  }
+
+  return { success: true, data: undefined };
+}
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "رابط غير صالح"),
+  password: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل"),
+});
+
+export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
+  const parsed = resetPasswordSchema.safeParse({
+    token: formData.get("token") as string,
+    password: formData.get("password") as string,
+  });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "خطأ في البيانات" };
+  }
+
+  const { token, password } = parsed.data;
+  const record = await verifyPasswordResetToken(token);
+  if (!record) {
+    return { success: false, error: "رابط إعادة التعيين غير صالح أو منتهي الصلاحية" };
+  }
+
+  const passwordHash = await hashPassword(password);
+  await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, record.userId));
+  await markPasswordResetTokenUsed(record.id);
 
   return { success: true, data: undefined };
 }
