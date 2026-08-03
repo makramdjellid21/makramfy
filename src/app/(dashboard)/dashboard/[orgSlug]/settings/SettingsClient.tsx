@@ -87,6 +87,16 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [activeTab, setActiveTab] = useState("general");
+
+  const tabs = [
+    { id: "general", label: "عام" },
+    { id: "appearance", label: "المظهر والتواصل" },
+    { id: "promo", label: "الترويج والتواصل الاجتماعي" },
+    { id: "legal", label: "الصفحات القانونية" },
+    { id: "marketing", label: "التسويق" },
+    ...(canDelete ? [{ id: "danger", label: "منطقة الخطر" }] : []),
+  ];
 
   // كل حقول storeSettings تُحفظ مع بعض دائمًا (نفس الصف بقاعدة البيانات)، بغض النظر عن أي زر ضُغط
   function buildFormData() {
@@ -177,7 +187,24 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
       {error && <Alert type="error">{error}</Alert>}
       {success && <Alert type="success">{success}</Alert>}
 
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? "bg-violet-600 text-white"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* رابط المتجر + النشر */}
+      {activeTab === "general" && (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">رابط المتجر</h2>
         <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3">
@@ -228,8 +255,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      )}
 
       {/* إعدادات المتجر (Theme) */}
+      {activeTab === "appearance" && (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">تخصيص المتجر</h2>
 
@@ -275,8 +304,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      )}
 
       {/* الإعلان الترويجي */}
+      {activeTab === "promo" && (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <Megaphone size={18} className="text-amber-500" />
@@ -344,8 +375,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      )}
 
       {/* الصفحات القانونية */}
+      {activeTab === "legal" && (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-slate-500" />
@@ -379,8 +412,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      )}
 
       {/* التسويق والتكاملات */}
+      {activeTab === "marketing" && (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">التسويق والتكاملات</h2>
@@ -450,9 +485,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      )}
 
       {/* منطقة الخطر */}
-      {canDelete && (
+      {canDelete && activeTab === "danger" && (
         <div className="bg-red-50 rounded-2xl border border-red-100 p-6 space-y-3">
           <h2 className="text-lg font-semibold text-red-800">منطقة الخطر</h2>
           <p className="text-sm text-red-700">

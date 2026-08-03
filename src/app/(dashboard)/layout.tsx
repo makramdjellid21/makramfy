@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserOrganizations } from "@/actions/organizations";
-import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
+import { DashboardShell } from "@/components/layout/DashboardShell";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -24,24 +24,16 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   }));
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden" dir="rtl">
-      {/* Sidebar */}
-      <div className="w-64 shrink-0 border-l border-slate-100 overflow-y-auto">
-        <DashboardSidebar
-          user={{
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            imageUrl: user.imageUrl,
-          }}
-          organizations={organizations}
-        />
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        <main className="min-h-full p-6 lg:p-8">{children}</main>
-      </div>
-    </div>
+    <DashboardShell
+      user={{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        imageUrl: user.imageUrl,
+      }}
+      organizations={organizations}
+    >
+      {children}
+    </DashboardShell>
   );
 }

@@ -44,12 +44,14 @@ interface DashboardSidebarProps {
   user: SidebarUser;
   organizations: SidebarOrg[];
   currentOrgSlug?: string;
+  onNavigate?: () => void;
 }
 
 export function DashboardSidebar({
   user,
   organizations,
   currentOrgSlug,
+  onNavigate,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [orgOpen, setOrgOpen] = useState(false);
@@ -142,7 +144,10 @@ export function DashboardSidebar({
               <Link
                 key={org.id}
                 href={`/dashboard/${org.slug}`}
-                onClick={() => setOrgOpen(false)}
+                onClick={() => {
+                  setOrgOpen(false);
+                  onNavigate?.();
+                }}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors",
                   org.slug === currentOrgSlug && "bg-violet-50"
@@ -154,7 +159,10 @@ export function DashboardSidebar({
             ))}
             <Link
               href="/dashboard/new"
-              onClick={() => setOrgOpen(false)}
+              onClick={() => {
+                setOrgOpen(false);
+                onNavigate?.();
+              }}
               className="flex items-center gap-3 px-3 py-2.5 text-violet-600 hover:bg-violet-50 transition-colors border-t border-slate-100"
             >
               <Plus size={16} />
@@ -172,6 +180,7 @@ export function DashboardSidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                 active
