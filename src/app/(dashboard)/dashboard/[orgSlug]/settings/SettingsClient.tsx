@@ -205,6 +205,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
       {/* رابط المتجر + النشر */}
       {activeTab === "general" && (
+      <>
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">رابط المتجر</h2>
         <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3">
@@ -255,6 +256,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      </>
       )}
 
       {/* إعدادات المتجر (Theme) */}
@@ -308,6 +310,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
       {/* الإعلان الترويجي */}
       {activeTab === "promo" && (
+      <>
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <Megaphone size={18} className="text-amber-500" />
@@ -375,6 +378,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      </>
       )}
 
       {/* الصفحات القانونية */}
