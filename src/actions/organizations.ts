@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { eq, and, count, desc, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
-import { generateId, generateSlug } from "@/lib/utils";
+import { generateId, generateOrgSlug } from "@/lib/utils";
 import { requirePermission, hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
 import type { Plan } from "@/lib/plans";
@@ -57,12 +57,21 @@ export async function createOrganizationAction(
 ): Promise<ActionResult<{ orgId: string; slug: string }>> {
   const user = await requireAuth();
   const name = (formData.get("name") as string)?.trim();
+  const slugSource = (formData.get("slug") as string)?.trim();
 
   if (!name || name.length < 2) {
     return { success: false, error: "اسم المتجر يجب أن يكون حرفين على الأقل" };
   }
 
-  const baseSlug = generateSlug(name);
+  const latinCandidate = (slugSource || name).replace(/[^a-zA-Z0-9\s-]/g, "").trim();
+  if (!latinCandidate) {
+    return {
+      success: false,
+      error: "رابط المتجر يجب أن يكون بأحرف إنجليزية وأرقام فقط (مثال: my-store)، لأنه سيُستخدم كرابط لمتجرك",
+    };
+  }
+
+  const baseSlug = generateOrgSlug(latinCandidate);
   let slug = baseSlug;
 
   // Ensure unique slug

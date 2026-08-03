@@ -55,6 +55,15 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [orgOpen, setOrgOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const settingsTabs = [
+    { id: "general", label: "عام" },
+    { id: "appearance", label: "المظهر والتواصل" },
+    { id: "promo", label: "الترويج والتواصل الاجتماعي" },
+    { id: "legal", label: "الصفحات القانونية" },
+    { id: "marketing", label: "التسويق" },
+  ];
 
   const currentOrg = organizations.find((o) => o.slug === currentOrgSlug) ?? organizations[0];
 
@@ -176,6 +185,42 @@ export function DashboardSidebar({
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const active = pathname === item.href;
+          const isSettings = item.label === "الإعدادات";
+
+          if (isSettings) {
+            return (
+              <div key={item.href}>
+                <button
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                    active
+                      ? "bg-violet-100 text-violet-700"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  <item.icon size={18} className={active ? "text-violet-600" : "text-slate-400"} />
+                  <span className="flex-1 text-right">{item.label}</span>
+                  <ChevronDown size={14} className={cn("transition-transform", settingsOpen && "rotate-180")} />
+                </button>
+                {settingsOpen && (
+                  <div className="mt-1 mr-8 space-y-0.5 border-r border-slate-100 pr-3">
+                    {settingsTabs.map((tab) => (
+                      <Link
+                        key={tab.id}
+                        href={`${item.href}?tab=${tab.id}`}
+                        onClick={onNavigate}
+                        className="block px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                      >
+                        {tab.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={item.href}

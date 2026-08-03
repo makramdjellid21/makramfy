@@ -56,9 +56,10 @@ export default function NewOrganizationPage() {
             label="اسم المتجر"
             name="name"
             type="text"
-            placeholder="متجر أحذية مثلاً"
+            placeholder="thi9a-shop"
             required
-            hint="سيتم إنشاء رابط فريد لمتجرك تلقائياً بناءً على الاسم"
+            dir="ltr"
+            hint="بأحرف إنجليزية وأرقام فقط — سيصبح رابط متجرك مثلاً: thi9a-shop.makramfy.com"
           />
 
           <Button type="submit" className="w-full" loading={loading} size="lg">

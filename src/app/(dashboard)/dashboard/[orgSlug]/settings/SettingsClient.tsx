@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
@@ -87,16 +87,10 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [activeTab, setActiveTab] = useState("general");
-
-  const tabs = [
-    { id: "general", label: "عام" },
-    { id: "appearance", label: "المظهر والتواصل" },
-    { id: "promo", label: "الترويج والتواصل الاجتماعي" },
-    { id: "legal", label: "الصفحات القانونية" },
-    { id: "marketing", label: "التسويق" },
-    ...(canDelete ? [{ id: "danger", label: "منطقة الخطر" }] : []),
-  ];
+  const searchParams = useSearchParams();
+  const validTabIds = ["general", "appearance", "promo", "legal", "marketing"];
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab = tabFromUrl && validTabIds.includes(tabFromUrl) ? tabFromUrl : "general";
 
   // كل حقول storeSettings تُحفظ مع بعض دائمًا (نفس الصف بقاعدة البيانات)، بغض النظر عن أي زر ضُغط
   function buildFormData() {
@@ -181,27 +175,19 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">الإعدادات</h1>
-        <p className="text-sm text-slate-500 mt-0.5">إدارة معلومات ونشر متجرك</p>
+        <p className="text-sm text-slate-500 mt-0.5">
+          {{
+            general: "المعلومات العامة ورابط المتجر",
+            appearance: "المظهر وبيانات التواصل",
+            promo: "الإعلان الترويجي والتواصل الاجتماعي",
+            legal: "الصفحات القانونية",
+            marketing: "التسويق والتكاملات",
+          }[activeTab] ?? "إدارة معلومات ونشر متجرك"}
+        </p>
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
       {success && <Alert type="success">{success}</Alert>}
-
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? "bg-violet-600 text-white"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       {/* رابط المتجر + النشر */}
       {activeTab === "general" && (
@@ -492,7 +478,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
       )}
 
       {/* منطقة الخطر */}
-      {canDelete && activeTab === "danger" && (
+      {canDelete && activeTab === "general" && (
         <div className="bg-red-50 rounded-2xl border border-red-100 p-6 space-y-3">
           <h2 className="text-lg font-semibold text-red-800">منطقة الخطر</h2>
           <p className="text-sm text-red-700">
