@@ -15,14 +15,20 @@ import {
   toggleProductActiveAction,
   toggleProductFeaturedAction,
   updateStockAction,
+  addProductVariantAction,
+  updateProductVariantAction,
+  deleteProductVariantAction,
 } from "@/actions/products";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { Plus, Package, Trash2, MoreVertical, Pencil, Tag, Star } from "lucide-react";
+import { Plus, Package, Trash2, MoreVertical, Pencil, Tag, Star, X, Layers } from "lucide-react";
 
 interface Variant {
   id: string;
+  name: string;
+  priceCents: number | null;
   stockQuantity: number;
+  imageUrl: string | null;
 }
 
 interface Product {
@@ -30,6 +36,7 @@ interface Product {
   name: string;
   description: string | null;
   imageUrl: string | null;
+  images: string[];
   basePriceCents: number;
   isActive: boolean;
   isFeatured: boolean;
@@ -73,6 +80,7 @@ export function ProductsClient({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
   const [stockQuantity, setStockQuantity] = useState("0");
@@ -80,6 +88,7 @@ export function ProductsClient({
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [variantsProduct, setVariantsProduct] = useState<Product | null>(null);
 
   const canManage = hasPermission(myRole as Role, "manage_products");
   const canDelete = hasPermission(myRole as Role, "delete_product");
@@ -90,6 +99,7 @@ export function ProductsClient({
     setName("");
     setDescription("");
     setImageUrl("");
+    setImages([]);
     setCategoryId("");
     setPrice("");
     setStockQuantity("0");
@@ -102,6 +112,7 @@ export function ProductsClient({
     setName(product.name);
     setDescription(product.description ?? "");
     setImageUrl(product.imageUrl ?? "");
+    setImages(product.images ?? []);
     setCategoryId(product.categoryId ?? "");
     setPrice(String(product.basePriceCents / 100));
     setStockQuantity(String(product.variants[0]?.stockQuantity ?? 0));
@@ -118,6 +129,7 @@ export function ProductsClient({
     formData.set("name", name.trim());
     formData.set("description", description.trim());
     formData.set("imageUrl", imageUrl);
+    formData.set("images", JSON.stringify(images));
     formData.set("categoryId", categoryId);
     formData.set("price", price);
     formData.set("stockQuantity", stockQuantity);
@@ -279,6 +291,16 @@ export function ProductsClient({
                               تعديل
                             </button>
                             <button
+                              className="w-full text-right px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                              onClick={() => {
+                                setVariantsProduct(product);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              <Layers size={14} />
+                              الألوان / المقاسات
+                            </button>
+                            <button
                               className="w-full text-right px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                               onClick={() => handleToggleActive(product)}
                             >
@@ -382,7 +404,35 @@ export function ProductsClient({
             />
           </div>
 
-          <ImageUploader value={imageUrl} onChange={setImageUrl} folder="makramfy/products" label="صورة المنتج" />
+          <ImageUploader value={imageUrl} onChange={setImageUrl} folder="makramfy/products" label="الصورة الرئيسية" />
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-2">صور إضافية (اختياري)</label>
+            <div className="flex flex-wrap gap-3">
+              {images.map((url, i) => (
+                <div key={i} className="relative w-20 h-20 group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="w-20 h-20 rounded-xl object-cover border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() => setImages(images.filter((_, idx) => idx !== i))}
+                    className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md border border-slate-200"
+                  >
+                    <X size={12} className="text-slate-600" />
+                  </button>
+                </div>
+              ))}
+              <div className="w-20">
+                <ImageUploader
+                  value=""
+                  onChange={(url) => url && setImages([...images, url])}
+                  folder="makramfy/products"
+                  label=""
+                  className="[&>div]:w-20 [&>div]:h-20 [&>div]:p-0 [&>div]:flex [&>div]:items-center [&>div]:justify-center"
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="flex gap-3 pt-2">
             <Button onClick={handleSubmit} loading={loading} className="flex-1">
@@ -394,6 +444,192 @@ export function ProductsClient({
           </div>
         </div>
       </Modal>
+
+      {variantsProduct && (
+        <VariantsModal
+          orgId={orgId}
+          product={variantsProduct}
+          onClose={() => setVariantsProduct(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function VariantsModal({
+  orgId,
+  product,
+  onClose,
+}: {
+  orgId: string;
+  product: Product;
+  onClose: () => void;
+}) {
+  const [variants, setVariants] = useState<Variant[]>(product.variants);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // نموذج إضافة متغيّر جديد
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newStock, setNewStock] = useState("0");
+  const [newImage, setNewImage] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  async function handleAdd() {
+    if (!newName.trim()) {
+      setError("اكتب اسم المتغيّر (مثال: أحمر - L)");
+      return;
+    }
+    setAdding(true);
+    setError("");
+    const result = await addProductVariantAction(orgId, product.id, {
+      name: newName.trim(),
+      priceCents: newPrice ? Math.round(Number(newPrice) * 100) : null,
+      stockQuantity: Number(newStock) || 0,
+      imageUrl: newImage || null,
+    });
+    setAdding(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setVariants([
+      ...variants,
+      {
+        id: result.data.variantId,
+        name: newName.trim(),
+        priceCents: newPrice ? Math.round(Number(newPrice) * 100) : null,
+        stockQuantity: Number(newStock) || 0,
+        imageUrl: newImage || null,
+      },
+    ]);
+    setNewName("");
+    setNewPrice("");
+    setNewStock("0");
+    setNewImage("");
+  }
+
+  async function handleUpdate(v: Variant) {
+    setBusy(v.id);
+    setError("");
+    const result = await updateProductVariantAction(orgId, v.id, {
+      name: v.name,
+      priceCents: v.priceCents,
+      stockQuantity: v.stockQuantity,
+      imageUrl: v.imageUrl,
+    });
+    setBusy(null);
+    if (!result.success) setError(result.error);
+  }
+
+  async function handleDelete(variantId: string) {
+    if (!confirm("حذف هذا المتغيّر؟")) return;
+    setBusy(variantId);
+    setError("");
+    const result = await deleteProductVariantAction(orgId, product.id, variantId);
+    setBusy(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setVariants(variants.filter((v) => v.id !== variantId));
+  }
+
+  function updateLocal(id: string, patch: Partial<Variant>) {
+    setVariants(variants.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title={`الألوان / المقاسات — ${product.name}`} size="md">
+      <div className="space-y-4">
+        {error && <Alert type="error">{error}</Alert>}
+        <p className="text-xs text-slate-500">
+          كل متغيّر يظهر للعميل كخيار منفصل (مثال: أحمر - L). اترك السعر فارغًا لاستخدام سعر المنتج الأساسي.
+        </p>
+
+        <div className="space-y-3 max-h-72 overflow-y-auto">
+          {variants.map((v) => (
+            <div key={v.id} className="border border-slate-200 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                  value={v.name}
+                  onChange={(e) => updateLocal(v.id, { name: e.target.value })}
+                  placeholder="أحمر - L"
+                />
+                <button
+                  onClick={() => handleDelete(v.id)}
+                  disabled={busy === v.id}
+                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                  type="number"
+                  min="0"
+                  placeholder="السعر (اختياري)"
+                  value={v.priceCents !== null ? v.priceCents / 100 : ""}
+                  onChange={(e) =>
+                    updateLocal(v.id, { priceCents: e.target.value ? Math.round(Number(e.target.value) * 100) : null })
+                  }
+                />
+                <input
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                  type="number"
+                  min="0"
+                  placeholder="المخزون"
+                  value={v.stockQuantity}
+                  onChange={(e) => updateLocal(v.id, { stockQuantity: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <Button size="sm" variant="outline" onClick={() => handleUpdate(v)} loading={busy === v.id}>
+                حفظ
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 space-y-2">
+          <p className="text-sm font-medium text-slate-700">إضافة متغيّر جديد</p>
+          <input
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+            placeholder="مثال: أحمر - L"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+              type="number"
+              min="0"
+              placeholder="السعر (اختياري)"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+            />
+            <input
+              className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+              type="number"
+              min="0"
+              placeholder="المخزون"
+              value={newStock}
+              onChange={(e) => setNewStock(e.target.value)}
+            />
+          </div>
+          <ImageUploader value={newImage} onChange={setNewImage} folder="makramfy/products" label="صورة هذا المتغيّر (اختياري)" />
+          <Button onClick={handleAdd} loading={adding} className="w-full">
+            <Plus size={14} />
+            إضافة المتغيّر
+          </Button>
+        </div>
+
+        <Button variant="outline" onClick={onClose} className="w-full">
+          إغلاق
+        </Button>
+      </div>
+    </Modal>
   );
 }

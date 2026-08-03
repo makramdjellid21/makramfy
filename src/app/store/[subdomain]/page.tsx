@@ -136,37 +136,6 @@ export default async function StoreHomePage({ params, searchParams }: PageProps)
 
         {!searchTerm && <CategoryGrid categories={categoriesList} themeColor={color} />}
 
-        {/* شريط التصنيفات */}
-        {!searchTerm && categoriesList.length > 0 && (
-          <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
-            <Link
-              href="/"
-              className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
-              style={
-                !activeCategorySlug
-                  ? { backgroundColor: color, borderColor: color, color: "#fff" }
-                  : { borderColor: "#e2e8f0", color: "#475569" }
-              }
-            >
-              الكل
-            </Link>
-            {categoriesList.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/?category=${cat.slug}`}
-                className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border transition-colors"
-                style={
-                  activeCategorySlug === cat.slug
-                    ? { backgroundColor: color, borderColor: color, color: "#fff" }
-                    : { borderColor: "#e2e8f0", color: "#475569" }
-                }
-              >
-                {cat.name}
-              </Link>
-            ))}
-          </div>
-        )}
-
         {/* منتجات مميزة */}
         {featuredProducts.length > 0 && isDefaultView && (
           <div className="mb-10">

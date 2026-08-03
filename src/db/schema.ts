@@ -6,6 +6,7 @@ import {
   integer,
   boolean,
   bigint,
+  jsonb,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -205,6 +206,7 @@ export const products = pgTable(
     slug: text("slug").notNull(),
     description: text("description"),
     imageUrl: text("image_url"),
+    images: jsonb("images").$type<string[]>().notNull().default([]),
     basePriceCents: integer("base_price_cents").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     isFeatured: boolean("is_featured").notNull().default(false),
