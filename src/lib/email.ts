@@ -44,6 +44,10 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     subject: "إعادة تعيين كلمة المرور — MakramFy",
     html: `
       <div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <img src="https://res.cloudinary.com/qofcxjhe/image/upload/v1785677878/makramfy/logos/mdkfdh5sv7fiqj3zxd2k.png"
+             alt="MakramFy"
+             width="120"
+             style="display: block; margin: 0 auto 20px;" />
         <h2 style="color: #7c3aed;">إعادة تعيين كلمة المرور</h2>
         <p style="color: #334155; line-height: 1.7;">
           وصلنا طلب لإعادة تعيين كلمة مرور حسابك على MakramFy. اضغط الزر أدناه لاختيار كلمة مرور جديدة.
