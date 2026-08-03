@@ -9,6 +9,7 @@ import {
   orders,
   orderItems,
   productVariants,
+  subscriptions,
 } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils";
@@ -32,7 +33,12 @@ export async function getPublishedStore(subdomain: string) {
 
   if (!settings?.isPublished) return null;
 
-  return { org, settings };
+  const [subscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.organizationId, org.id));
+
+  return { org, settings, plan: subscription?.plan ?? "free" };
 }
 
 // ─── جلب منتجات متجر (فقط المفعّلة) ──────────────────────────────────────────

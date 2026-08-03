@@ -2,9 +2,10 @@ import { CreditCard, Wallet } from "lucide-react";
 
 interface StoreFooterProps {
   storeName: string;
+  showBranding: boolean;
 }
 
-export function StoreFooter({ storeName }: StoreFooterProps) {
+export function StoreFooter({ storeName, showBranding }: StoreFooterProps) {
   return (
     <footer className="border-t border-slate-100 mt-10">
       <div className="max-w-5xl mx-auto px-4 py-8 text-center">
@@ -21,12 +22,14 @@ export function StoreFooter({ storeName }: StoreFooterProps) {
             الدفع عند الاستلام
           </span>
         </div>
-        <p className="text-xs text-slate-400">
-          متجر مبني عبر{" "}
-          <a href="https://makramfy.com" className="font-semibold text-slate-600">
-            MakramFy
-          </a>
-        </p>
+        {showBranding && (
+          <p className="text-xs text-slate-400">
+            متجر مبني عبر{" "}
+            <a href="https://makramfy.com" className="font-semibold text-slate-600">
+              MakramFy
+            </a>
+          </p>
+        )}
       </div>
     </footer>
   );

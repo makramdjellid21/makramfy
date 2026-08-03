@@ -17,7 +17,7 @@ export default async function StoreLayout({
 
   if (!store) notFound();
 
-  const { org, settings } = store;
+  const { org, settings, plan } = store;
 
   // نستخرج التصنيفات الفعلية اللي عندها منتجات (لعرضها بالقائمة الجانبية)
   const productList = await getStoreProducts(org.id);
@@ -48,7 +48,7 @@ export default async function StoreLayout({
           categories={categoriesList}
         />
         <main className="flex-1">{children}</main>
-        <StoreFooter storeName={org.name} />
+        <StoreFooter storeName={org.name} showBranding={plan === "free"} />
       </div>
     </StoreThemeProvider>
   );
