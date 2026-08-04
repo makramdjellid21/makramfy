@@ -19,7 +19,7 @@ import {
 } from "@/lib/auth";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { generateId } from "@/lib/utils";
-import { checkLoginRateLimit, recordLoginAttempt, getClientIp } from "@/lib/security";
+import { checkLoginRateLimit, recordLoginAttempt, getClientIp } from "@/lib/rate-limit";
 
 const registerSchema = z.object({
   name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),

@@ -1,12 +1,13 @@
 "use server";
 
 import { db } from "@/db";
-import { orders, memberships, blockedPhones } from "@/db/schema";
-import { eq, and, desc, isNull, or } from "drizzle-orm";
+import { orders, memberships, customers, blockedPhones } from "@/db/schema";
+import { eq, and, desc, count, inArray, or, isNull } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
 import type { ActionResult } from "./auth";
+import { generateId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 async function getMembership(userId: string, orgId: string) {
@@ -17,15 +18,6 @@ async function getMembership(userId: string, orgId: string) {
   return membership;
 }
 
-// ─── مؤشرات مخاطر لكل طلب (لعرض تحذيرات COD بلوحة التحكم) ──────────────────────
-export interface OrderRiskFlags {
-  isBlocked: boolean;
-  blockScope: "store" | "platform" | null;
-  customerTotalOrders: number;
-  customerCanceledOrders: number;
-  highCancelRate: boolean;
-}
-
 export async function getOrders(orgId: string) {
   const orderList = await db.query.orders.findMany({
     where: eq(orders.organizationId, orgId),
@@ -33,49 +25,92 @@ export async function getOrders(orgId: string) {
     orderBy: desc(orders.createdAt),
   });
 
-  if (!orderList.length) return [] as (typeof orderList[number] & { risk: OrderRiskFlags })[];
+  const phones = [...new Set(orderList.map((o) => o.customer?.phone).filter((p): p is string => Boolean(p)))];
+  if (phones.length === 0) return orderList.map((o) => ({ ...o, canceledCount: 0, isBlocked: false }));
 
-  // الأرقام المحظورة (على مستوى هذا المتجر أو على مستوى المنصة)
+  // عدد الطلبات الملغاة/المرتجعة سابقًا لكل رقم هاتف بهذا المتجر (مؤشر احتيال)
+  const canceledCounts = await db
+    .select({ phone: customers.phone, value: count() })
+    .from(orders)
+    .innerJoin(customers, eq(orders.customerId, customers.id))
+    .where(
+      and(
+        eq(orders.organizationId, orgId),
+        inArray(orders.status, ["canceled", "refunded"]),
+        inArray(customers.phone, phones)
+      )
+    )
+    .groupBy(customers.phone);
+
+  const canceledMap = new Map(canceledCounts.map((c) => [c.phone, c.value]));
+
+  // الأرقام المحظورة: إمّا خاصة بهذا المتجر أو محظورة على مستوى المنصة كلها
   const blocked = await db
+    .select({ phone: blockedPhones.phone })
+    .from(blockedPhones)
+    .where(and(inArray(blockedPhones.phone, phones), or(eq(blockedPhones.organizationId, orgId), isNull(blockedPhones.organizationId))));
+
+  const blockedSet = new Set(blocked.map((b) => b.phone));
+
+  return orderList.map((o) => ({
+    ...o,
+    canceledCount: o.customer?.phone ? canceledMap.get(o.customer.phone) ?? 0 : 0,
+    isBlocked: o.customer?.phone ? blockedSet.has(o.customer.phone) : false,
+  }));
+}
+
+// ─── القائمة السوداء لأرقام الهواتف (حماية من الطلبات الوهمية) ─────────────────
+export async function getBlockedPhonesAction(orgId: string): Promise<ActionResult<{ id: string; phone: string; reason: string | null; createdAt: Date }[]>> {
+  const user = await requireAuth();
+  const membership = await getMembership(user.id, orgId);
+  if (!membership) return { success: false, error: "غير مصرح" };
+
+  const rows = await db
     .select()
     .from(blockedPhones)
-    .where(or(eq(blockedPhones.organizationId, orgId), isNull(blockedPhones.organizationId)));
+    .where(eq(blockedPhones.organizationId, orgId))
+    .orderBy(desc(blockedPhones.createdAt));
 
-  const platformBlockedSet = new Set(blocked.filter((b) => b.organizationId === null).map((b) => b.phone));
-  const storeBlockedSet = new Set(blocked.filter((b) => b.organizationId === orgId).map((b) => b.phone));
+  return { success: true, data: rows };
+}
 
-  // إحصاء طلبات كل زبون (إجمالي وملغى) لحساب معدل الإلغاء
-  const perCustomer = new Map<string, { total: number; canceled: number }>();
-  for (const order of orderList) {
-    const stat = perCustomer.get(order.customerId) ?? { total: 0, canceled: 0 };
-    stat.total += 1;
-    if (order.status === "canceled" || order.status === "refunded") stat.canceled += 1;
-    perCustomer.set(order.customerId, stat);
-  }
+export async function blockPhoneAction(orgId: string, phone: string, reason?: string): Promise<ActionResult> {
+  const user = await requireAuth();
+  const membership = await getMembership(user.id, orgId);
+  if (!membership) return { success: false, error: "غير مصرح" };
+  requirePermission(membership.role as Role, "manage_orders");
 
-  return orderList.map((order) => {
-    const phone = order.customer?.phone ?? "";
-    const isBlocked = platformBlockedSet.has(phone) || storeBlockedSet.has(phone);
-    const blockScope: "store" | "platform" | null = platformBlockedSet.has(phone)
-      ? "platform"
-      : storeBlockedSet.has(phone)
-        ? "store"
-        : null;
+  const cleanPhone = phone.trim();
+  if (!cleanPhone) return { success: false, error: "رقم الهاتف مطلوب" };
 
-    const stat = perCustomer.get(order.customerId) ?? { total: 0, canceled: 0 };
-    const highCancelRate = stat.total >= 2 && stat.canceled / stat.total >= 0.5;
+  const [existing] = await db
+    .select()
+    .from(blockedPhones)
+    .where(and(eq(blockedPhones.organizationId, orgId), eq(blockedPhones.phone, cleanPhone)));
+  if (existing) return { success: true, data: undefined };
 
-    return {
-      ...order,
-      risk: {
-        isBlocked,
-        blockScope,
-        customerTotalOrders: stat.total,
-        customerCanceledOrders: stat.canceled,
-        highCancelRate,
-      } satisfies OrderRiskFlags,
-    };
+  await db.insert(blockedPhones).values({
+    id: generateId(),
+    organizationId: orgId,
+    phone: cleanPhone,
+    reason: reason?.trim() || null,
+    reportedByOrgId: orgId,
   });
+
+  revalidatePath("/dashboard");
+  return { success: true, data: undefined };
+}
+
+export async function unblockPhoneAction(orgId: string, id: string): Promise<ActionResult> {
+  const user = await requireAuth();
+  const membership = await getMembership(user.id, orgId);
+  if (!membership) return { success: false, error: "غير مصرح" };
+  requirePermission(membership.role as Role, "manage_orders");
+
+  await db.delete(blockedPhones).where(and(eq(blockedPhones.id, id), eq(blockedPhones.organizationId, orgId)));
+
+  revalidatePath("/dashboard");
+  return { success: true, data: undefined };
 }
 
 export async function updateOrderStatusAction(
