@@ -16,9 +16,10 @@ interface CheckoutFormProps {
   subdomain: string;
   organizationId: string;
   themeColor: string;
+  allowOnlinePayment: boolean;
 }
 
-export function CheckoutForm({ subdomain, organizationId, themeColor }: CheckoutFormProps) {
+export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlinePayment }: CheckoutFormProps) {
   const router = useRouter();
   const { items, ready, totalCents: itemsTotalCents, clear } = useCart(subdomain);
 
@@ -224,7 +225,7 @@ export function CheckoutForm({ subdomain, organizationId, themeColor }: Checkout
 
       <div className="mb-6">
         <label className="text-sm font-medium text-slate-700 block mb-2">طريقة الدفع</label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${allowOnlinePayment ? "grid-cols-2" : "grid-cols-1"}`}>
           <button
             type="button"
             onClick={() => setPaymentMethod("cod")}
@@ -236,22 +237,24 @@ export function CheckoutForm({ subdomain, organizationId, themeColor }: Checkout
             <Truck size={18} className="mb-2" style={{ color: paymentMethod === "cod" ? themeColor : "#94a3b8" }} />
             <p className="text-sm font-medium text-slate-800">الدفع عند الاستلام</p>
           </button>
-          <button
-            type="button"
-            onClick={() => setPaymentMethod("online")}
-            className={`p-4 rounded-xl border-2 text-right transition-colors ${
-              paymentMethod === "online" ? "border-current" : "border-slate-200"
-            }`}
-            style={paymentMethod === "online" ? { borderColor: themeColor, backgroundColor: `${themeColor}0d` } : {}}
-          >
-            <CreditCard
-              size={18}
-              className="mb-2"
-              style={{ color: paymentMethod === "online" ? themeColor : "#94a3b8" }}
-            />
-            <p className="text-sm font-medium text-slate-800">دفع أونلاين</p>
-            <p className="text-xs text-slate-400 mt-0.5">EDAHABIA / CIB</p>
-          </button>
+          {allowOnlinePayment && (
+            <button
+              type="button"
+              onClick={() => setPaymentMethod("online")}
+              className={`p-4 rounded-xl border-2 text-right transition-colors ${
+                paymentMethod === "online" ? "border-current" : "border-slate-200"
+              }`}
+              style={paymentMethod === "online" ? { borderColor: themeColor, backgroundColor: `${themeColor}0d` } : {}}
+            >
+              <CreditCard
+                size={18}
+                className="mb-2"
+                style={{ color: paymentMethod === "online" ? themeColor : "#94a3b8" }}
+              />
+              <p className="text-sm font-medium text-slate-800">دفع أونلاين</p>
+              <p className="text-xs text-slate-400 mt-0.5">EDAHABIA / CIB</p>
+            </button>
+          )}
         </div>
       </div>
 

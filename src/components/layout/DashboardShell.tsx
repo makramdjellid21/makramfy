@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 interface SidebarOrg {
   id: string;
@@ -29,6 +30,7 @@ interface DashboardShellProps {
 
 export function DashboardShell({ user, organizations, currentOrgSlug, children }: DashboardShellProps) {
   const [open, setOpen] = useState(false);
+  const currentOrg = organizations.find((o) => o.slug === currentOrgSlug) ?? organizations[0];
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden" dir="rtl">
@@ -80,6 +82,8 @@ export function DashboardShell({ user, organizations, currentOrgSlug, children }
               Makram<span className="text-violet-600">Fy</span>
             </span>
           </Link>
+          <div className="flex-1" />
+          {currentOrg && <NotificationBell orgId={currentOrg.id} />}
         </div>
 
         <main className="min-h-full flex-1 p-4 sm:p-6 lg:p-8">{children}</main>

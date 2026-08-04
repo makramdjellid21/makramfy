@@ -16,6 +16,7 @@ import { generateId } from "@/lib/utils";
 import { createChargilyCheckout } from "@/lib/chargily";
 import { getDeliveryPrice, getWilaya } from "@/lib/wilayas";
 import { sendTelegramMessage, formatOrderNotification } from "@/lib/telegram";
+import { createNotification } from "./notifications";
 import type { ActionResult } from "./auth";
 import { revalidatePath } from "next/cache";
 
@@ -242,6 +243,20 @@ export async function createOrderAction(
     console.error("Telegram notification failed:", err);
   }
 
+  // إشعار داخلي بلوحة التحكم (زر الجرس)
+  try {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    await createNotification(
+      organizationId,
+      "order",
+      "طلب جديد 🎉",
+      `${customerInfo.name.trim()} — ${(totalCents / 100).toLocaleString("ar-DZ")} د.ج`,
+      `/dashboard/${org?.slug ?? ""}/orders`
+    );
+  } catch (err) {
+    console.error("Internal notification failed:", err);
+  }
+
   revalidatePath("/dashboard");
   return { success: true, data: { orderId } };
 }
@@ -253,6 +268,11 @@ export async function createOrderPaymentCheckoutAction(
   orderId: string,
   amountCents: number
 ): Promise<ActionResult<{ url: string }>> {
+  const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.organizationId, organizationId));
+  if ((sub?.plan ?? "free") === "free") {
+    return { success: false, error: "الدفع الإلكتروني متاح فقط للمتاجر على الخطة الاحترافية أو أعمال" };
+  }
+
   const result = await createChargilyCheckout({
     amount: Math.round(amountCents / 100),
     successUrl: `https://${subdomain}.${ROOT_DOMAIN}/order-success?order=${orderId}`,

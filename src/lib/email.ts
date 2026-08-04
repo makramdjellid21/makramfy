@@ -61,3 +61,33 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
     `,
   });
 }
+
+export async function sendInviteEmail(
+  to: string,
+  storeName: string,
+  inviterName: string,
+  acceptUrl: string
+) {
+  return sendEmail({
+    to,
+    subject: `${inviterName} دعاك للانضمام إلى متجر ${storeName} على MakramFy`,
+    html: `
+      <div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #7c3aed;">دعوة للانضمام إلى فريق</h2>
+        <p style="color: #334155; line-height: 1.7;">
+          دعاك <strong>${inviterName}</strong> للانضمام إلى فريق متجر <strong>${storeName}</strong> على MakramFy.
+          اضغط الزر أدناه لقبول الدعوة. هذا الرابط صالح لمدة 7 أيام.
+        </p>
+        <a href="${acceptUrl}"
+           style="display: inline-block; background: #7c3aed; color: #fff; text-decoration: none;
+                  padding: 12px 28px; border-radius: 12px; font-weight: bold; margin: 16px 0;">
+          قبول الدعوة
+        </a>
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">
+          إذا كان عندك حساب بالفعل على MakramFy بنفس هذا الإيميل، سجّل دخولك أولًا ثم افتح الرابط.
+          إن لم يكن لديك حساب، سيُطلب منك إنشاء واحد بنفس هذا الإيميل قبل قبول الدعوة.
+        </p>
+      </div>
+    `,
+  });
+}

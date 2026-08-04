@@ -13,22 +13,22 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
     label: "مجاني",
     price: 0,
-    maxMembers: 2,
-    maxStorageBytes: 500 * 1024 * 1024, // 500MB
-    maxProducts: 10,
+    maxMembers: 1,
+    maxStorageBytes: 250 * 1024 * 1024, // 250MB
+    maxProducts: 15,
   },
   pro: {
     label: "احترافي",
-    price: 2900,
-    maxMembers: 10,
+    price: 1500,
+    maxMembers: 5,
     maxStorageBytes: 5 * 1024 * 1024 * 1024, // 5GB
     maxProducts: Infinity,
   },
   business: {
     label: "أعمال",
-    price: 9900,
+    price: 4500,
     maxMembers: Infinity,
-    maxStorageBytes: 50 * 1024 * 1024 * 1024, // 50GB
+    maxStorageBytes: 25 * 1024 * 1024 * 1024, // 25GB
     maxProducts: Infinity,
   },
 };

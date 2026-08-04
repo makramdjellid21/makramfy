@@ -9,7 +9,16 @@ cloudinary.config({
 
 export { cloudinary };
 
-export function generateSignature(params: Record<string, string | number>): {
+interface CloudinaryCredentials {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+}
+
+export function generateSignature(
+  params: Record<string, string | number>,
+  overrideCredentials?: CloudinaryCredentials
+): {
   signature: string;
   timestamp: number;
   apiKey: string;
@@ -18,23 +27,13 @@ export function generateSignature(params: Record<string, string | number>): {
   const timestamp = Math.round(Date.now() / 1000);
   const paramsWithTimestamp = { ...params, timestamp };
 
-  // Sort keys and build string to sign
-  const toSign = Object.keys(paramsWithTimestamp)
-    .sort()
-    .map((key) => `${key}=${paramsWithTimestamp[key as keyof typeof paramsWithTimestamp]}`)
-    .join("&");
+  const apiSecret = overrideCredentials?.apiSecret ?? process.env.CLOUDINARY_API_SECRET!;
+  const apiKey = overrideCredentials?.apiKey ?? process.env.CLOUDINARY_API_KEY!;
+  const cloudName = overrideCredentials?.cloudName ?? process.env.CLOUDINARY_CLOUD_NAME!;
 
-  const signature = cloudinary.utils.api_sign_request(
-    paramsWithTimestamp,
-    process.env.CLOUDINARY_API_SECRET!
-  );
+  const signature = cloudinary.utils.api_sign_request(paramsWithTimestamp, apiSecret);
 
-  return {
-    signature,
-    timestamp,
-    apiKey: process.env.CLOUDINARY_API_KEY!,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME!,
-  };
+  return { signature, timestamp, apiKey, cloudName };
 }
 
 export async function deleteCloudinaryImage(publicId: string) {

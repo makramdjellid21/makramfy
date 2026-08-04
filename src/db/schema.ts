@@ -183,6 +183,11 @@ export const storeSettings = pgTable("store_settings", {
   telegramBotToken: text("telegram_bot_token"),
   telegramChatId: text("telegram_chat_id"),
   facebookPixelId: text("facebook_pixel_id"),
+  // بيانات Cloudinary مخصصة لهذا المتجر (تُضبط من لوحة الأدمن فقط) — إن فُضّيت
+  // فارغة، يُستخدم حساب Cloudinary المشترك للمنصة تلقائيًا.
+  cloudinaryCloudName: text("cloudinary_cloud_name"),
+  cloudinaryApiKey: text("cloudinary_api_key"),
+  cloudinaryApiSecret: text("cloudinary_api_secret"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

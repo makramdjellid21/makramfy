@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { getCloudinarySignatureAction } from "@/actions/cloudinary";
+import { getCloudinarySignatureAction, recordUploadUsageAction } from "@/actions/cloudinary";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ interface ImageUploaderProps {
   folder?: string;
   label?: string;
   className?: string;
+  orgId?: string;
 }
 
 export function ImageUploader({
@@ -19,6 +20,7 @@ export function ImageUploader({
   folder = "makramfy",
   label = "رفع صورة",
   className,
+  orgId,
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +43,10 @@ export function ImageUploader({
     setUploading(true);
 
     try {
-      const sigResult = await getCloudinarySignatureAction(folder);
+      const sigResult = await getCloudinarySignatureAction(folder, orgId, file.size);
 
       if (!sigResult.success) {
-        // In demo mode without Cloudinary, use a placeholder
-        const fakeUrl = `https://res.cloudinary.com/demo/image/upload/${folder}/${file.name}`;
-        onChange(fakeUrl);
+        setError(sigResult.error);
         return;
       }
 
@@ -70,6 +70,10 @@ export function ImageUploader({
 
       const data = await response.json() as { secure_url: string };
       onChange(data.secure_url);
+
+      if (orgId) {
+        recordUploadUsageAction(orgId, file.size).catch(() => {});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "فشل رفع الصورة");
     } finally {

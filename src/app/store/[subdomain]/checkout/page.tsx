@@ -12,6 +12,11 @@ export default async function CheckoutPage({ params }: PageProps) {
   if (!store) notFound();
 
   return (
-    <CheckoutForm subdomain={subdomain} organizationId={store.org.id} themeColor={store.settings.themeColor} />
+    <CheckoutForm
+      subdomain={subdomain}
+      organizationId={store.org.id}
+      themeColor={store.settings.themeColor}
+      allowOnlinePayment={store.plan !== "free"}
+    />
   );
 }

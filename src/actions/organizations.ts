@@ -19,6 +19,8 @@ import type { Role } from "@/lib/permissions";
 import type { Plan } from "@/lib/plans";
 import { canAddMember } from "@/lib/plans";
 import type { ActionResult } from "./auth";
+import { sendInviteEmail } from "@/lib/email";
+import { createNotification } from "./notifications";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -32,7 +34,7 @@ async function getMembership(userId: string, orgId: string) {
 }
 
 // ─── Helper: get org with subscription and usage ───────────────────────────────
-async function getOrgData(orgId: string) {
+export async function getOrgData(orgId: string) {
   const [org] = await db
     .select()
     .from(organizations)
@@ -250,6 +252,11 @@ export async function inviteMemberAction(
     invitedById: user.id,
   });
 
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, orgId));
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const acceptUrl = `${appUrl}/accept-invite?token=${token}`;
+  await sendInviteEmail(email, org?.name ?? "متجرك", user.name ?? user.email, acceptUrl);
+
   revalidatePath(`/dashboard`);
   return { success: true, data: undefined };
 }
@@ -286,6 +293,15 @@ export async function acceptInvitationAction(token: string): Promise<ActionResul
     .where(eq(usageRecords.organizationId, invite.organizationId));
 
   await db.delete(invitations).where(eq(invitations.id, invite.id));
+
+  const [org] = await db.select().from(organizations).where(eq(organizations.id, invite.organizationId));
+  await createNotification(
+    invite.organizationId,
+    "member",
+    "عضو جديد انضم للفريق 👋",
+    `${user.name ?? user.email} انضم إلى ${org?.name ?? "متجرك"}`,
+    `/dashboard/${org?.slug ?? ""}/members`
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };

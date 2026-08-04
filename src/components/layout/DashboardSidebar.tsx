@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { logoutAction } from "@/actions/auth";
+import { NotificationBell } from "./NotificationBell";
 import { useState } from "react";
 
 interface NavItem {
@@ -111,7 +112,7 @@ export function DashboardSidebar({
   return (
     <div className="flex flex-col h-full bg-white border-l border-slate-100">
       {/* Logo */}
-      <div className="p-4 border-b border-slate-100">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-icon.png" alt="MakramFy" className="h-8 w-8 rounded-xl object-cover" />
@@ -119,6 +120,7 @@ export function DashboardSidebar({
             Makram<span className="text-violet-600">Fy</span>
           </span>
         </Link>
+        {currentOrg && <NotificationBell orgId={currentOrg.id} />}
       </div>
 
       {/* Org Switcher */}

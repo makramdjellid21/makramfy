@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
@@ -10,8 +10,11 @@ import { registerAction } from "@/actions/auth";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { Check } from "lucide-react";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +38,7 @@ export default function RegisterPage() {
       if (!result.success) {
         setError(result.error);
       } else {
-        router.push("/dashboard");
+        router.push(redirectTo || "/dashboard");
         router.refresh();
       }
     } finally {
@@ -134,5 +137,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-md text-center text-sm text-slate-400">جارٍ التحميل...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

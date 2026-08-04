@@ -235,7 +235,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">المعلومات العامة</h2>
         <Input label="اسم المتجر" value={name} onChange={(e) => setName(e.target.value)} disabled={!canEdit} />
-        <ImageUploader value={logoUrl} onChange={setLogoUrl} folder="makramfy/logos" label="شعار المتجر" />
+        <ImageUploader value={logoUrl} onChange={setLogoUrl} folder="makramfy/logos" label="شعار المتجر" orgId={orgId} />
         {canEdit && (
           <Button onClick={handleSaveGeneral} loading={savingGeneral}>
             حفظ
@@ -262,7 +262,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           />
         </div>
 
-        <ImageUploader value={bannerUrl} onChange={setBannerUrl} folder="makramfy/banners" label="صورة بانر المتجر" />
+        <ImageUploader value={bannerUrl} onChange={setBannerUrl} folder="makramfy/banners" label="صورة بانر المتجر" orgId={orgId} />
 
         <div>
           <label className="text-sm font-medium text-slate-700 block mb-1">لون المتجر الأساسي</label>

@@ -404,7 +404,7 @@ export function ProductsClient({
             />
           </div>
 
-          <ImageUploader value={imageUrl} onChange={setImageUrl} folder="makramfy/products" label="الصورة الرئيسية" />
+          <ImageUploader value={imageUrl} onChange={setImageUrl} folder="makramfy/products" label="الصورة الرئيسية" orgId={orgId} />
 
           <div>
             <label className="text-sm font-medium text-slate-700 block mb-2">صور إضافية (اختياري)</label>
@@ -428,6 +428,7 @@ export function ProductsClient({
                   onChange={(url) => url && setImages([...images, url])}
                   folder="makramfy/products"
                   label=""
+                  orgId={orgId}
                   className="[&>div]:w-20 [&>div]:h-20 [&>div]:p-0 [&>div]:flex [&>div]:items-center [&>div]:justify-center"
                 />
               </div>
@@ -619,7 +620,7 @@ function VariantsModal({
               onChange={(e) => setNewStock(e.target.value)}
             />
           </div>
-          <ImageUploader value={newImage} onChange={setNewImage} folder="makramfy/products" label="صورة هذا المتغيّر (اختياري)" />
+          <ImageUploader value={newImage} onChange={setNewImage} folder="makramfy/products" label="صورة هذا المتغيّر (اختياري)" orgId={orgId} />
           <Button onClick={handleAdd} loading={adding} className="w-full">
             <Plus size={14} />
             إضافة المتغيّر

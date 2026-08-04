@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { organizations, subscriptions, users, products, orders } from "@/db/schema";
+import { organizations, subscriptions, users, products, orders, storeSettings } from "@/db/schema";
 import { eq, count, desc } from "drizzle-orm";
 import { getPlatformAdmin } from "@/lib/admin-auth";
 import type { ActionResult } from "./auth";
@@ -22,7 +22,7 @@ export async function getPlatformStats() {
     .from(subscriptions)
     .groupBy(subscriptions.plan);
 
-  const revenueByPlan: Record<string, number> = { free: 0, pro: 2900, business: 9900 };
+  const revenueByPlan: Record<string, number> = { free: 0, pro: 1500, business: 4500 };
   const monthlyRevenueCents =
     planBreakdown.reduce((sum, row) => sum + (revenueByPlan[row.plan] ?? 0) * row.value, 0) * 100;
 
@@ -70,6 +70,40 @@ export async function adminSetStorePlanAction(
     .update(subscriptions)
     .set({ plan, status: plan === "free" ? "free" : "active", updatedAt: new Date() })
     .where(eq(subscriptions.organizationId, orgId));
+
+  revalidatePath("/admin/stores");
+  return { success: true, data: undefined };
+}
+
+// ─── إجراء إشرافي: ضبط/إزالة بيانات Cloudinary مخصصة لمتجر معيّن ────────────────
+export async function adminSetStoreCloudinaryAction(
+  orgId: string,
+  credentials: { cloudName: string; apiKey: string; apiSecret: string }
+): Promise<ActionResult> {
+  const admin = await getPlatformAdmin();
+  if (!admin) return { success: false, error: "غير مصرح" };
+
+  const cloudName = credentials.cloudName.trim();
+  const apiKey = credentials.apiKey.trim();
+  const apiSecret = credentials.apiSecret.trim();
+
+  // لو الثلاثة فارغة، هذا يعني "رجوع للحساب المشترك"
+  const allEmpty = !cloudName && !apiKey && !apiSecret;
+  const allFilled = cloudName && apiKey && apiSecret;
+
+  if (!allEmpty && !allFilled) {
+    return { success: false, error: "إمّا عبّي الحقول الثلاثة كلها، أو خليها فارغة كلها" };
+  }
+
+  await db
+    .update(storeSettings)
+    .set({
+      cloudinaryCloudName: allEmpty ? null : cloudName,
+      cloudinaryApiKey: allEmpty ? null : apiKey,
+      cloudinaryApiSecret: allEmpty ? null : apiSecret,
+      updatedAt: new Date(),
+    })
+    .where(eq(storeSettings.organizationId, orgId));
 
   revalidatePath("/admin/stores");
   return { success: true, data: undefined };

@@ -18,6 +18,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const googleError = searchParams.get("error");
+  const redirectTo = searchParams.get("redirect");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,7 +35,7 @@ function LoginForm() {
       if (!result.success) {
         setError(result.error);
       } else {
-        router.push("/dashboard");
+        router.push(redirectTo || "/dashboard");
         router.refresh();
       }
     } finally {
