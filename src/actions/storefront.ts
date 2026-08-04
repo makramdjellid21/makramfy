@@ -10,8 +10,9 @@ import {
   orderItems,
   productVariants,
   subscriptions,
+  blockedPhones,
 } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils";
 import { createChargilyCheckout } from "@/lib/chargily";
 import { getDeliveryPrice, getWilaya } from "@/lib/wilayas";
@@ -124,6 +125,32 @@ export async function createOrderAction(
   if (!wilaya) {
     return { success: false, error: "الولاية غير صحيحة" };
   }
+
+  // ─── الحماية من الطلبات الوهمية ─────────────────────────────────────────────
+  const phone = customerInfo.phone.trim();
+
+  // 1) رقم محظور (على مستوى هذا المتجر أو على مستوى المنصة كلها)
+  const [blocked] = await db
+    .select()
+    .from(blockedPhones)
+    .where(and(eq(blockedPhones.phone, phone), or(eq(blockedPhones.organizationId, organizationId), isNull(blockedPhones.organizationId))));
+
+  if (blocked) {
+    return { success: false, error: "تعذّر إتمام الطلب. يرجى التواصل مباشرة مع المتجر لإتمام عملية الشراء." };
+  }
+
+  // 2) عدد كبير من الطلبات بوقت قصير من نفس الرقم (نمط بوت/إزعاج متكرر)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const [recentCount] = await db
+    .select({ value: sql<number>`count(*)` })
+    .from(orders)
+    .innerJoin(customers, eq(orders.customerId, customers.id))
+    .where(and(eq(customers.phone, phone), sql`${orders.createdAt} > ${oneHourAgo}`));
+
+  if (Number(recentCount?.value ?? 0) >= 4) {
+    return { success: false, error: "لقد قمت بعدد كبير من الطلبات مؤخرًا. يرجى المحاولة لاحقًا أو التواصل مع المتجر." };
+  }
+
   const deliveryPriceDzd = getDeliveryPrice(customerInfo.wilayaCode, customerInfo.deliveryType) ?? 0;
   const deliveryPriceCents = Math.round(deliveryPriceDzd * 100);
 

@@ -102,6 +102,25 @@ export const notifications = pgTable(
   (t) => [index("notifications_org_idx").on(t.organizationId)]
 );
 
+// ─── القائمة السوداء لأرقام الهواتف (حماية من الطلبات الوهمية) ─────────────────
+// إن كان organizationId فارغًا = حظر على مستوى المنصة كلها (يديره الأدمن فقط).
+// إن كان محددًا = حظر خاص بمتجر واحد فقط (يديره صاحب المتجر).
+export const blockedPhones = pgTable(
+  "blocked_phones",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    reason: text("reason"),
+    reportedByOrgId: text("reported_by_org_id"), // أي متجر بلّغ عن هذا الرقم (لسياق العرض فقط)
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("blocked_phones_org_idx").on(t.organizationId),
+    index("blocked_phones_phone_idx").on(t.phone),
+  ]
+);
+
 // ─── Memberships ──────────────────────────────────────────────────────────────
 export const memberships = pgTable(
   "memberships",

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
-import { updateOrderStatusAction } from "@/actions/orders";
+import { updateOrderStatusAction, blockPhoneAction, unblockPhoneAction, getBlockedPhonesAction } from "@/actions/orders";
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/order-labels";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { ShoppingBag, MapPin } from "lucide-react";
+import { ShoppingBag, MapPin, ShieldAlert, ShieldOff, Ban, ChevronDown } from "lucide-react";
 
 interface OrderItem {
   id: string;
@@ -29,6 +29,8 @@ interface Order {
   createdAt: Date;
   customer: { name: string; phone: string | null } | null;
   items: OrderItem[];
+  canceledCount: number;
+  isBlocked: boolean;
 }
 
 interface OrdersClientProps {
@@ -56,6 +58,7 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localOrders, setLocalOrders] = useState(orders);
+  const [blockBusyPhone, setBlockBusyPhone] = useState<string | null>(null);
 
   const canManage = hasPermission(myRole as Role, "manage_orders");
 
@@ -70,6 +73,18 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
     }
   }
 
+  async function handleBlockPhone(phone: string) {
+    if (!confirm(`حظر الرقم ${phone}؟ لن يقدر يكمّل أي طلب جديد من متجرك.`)) return;
+    setBlockBusyPhone(phone);
+    const result = await blockPhoneAction(orgId, phone, "حظره التاجر يدويًا من صفحة الطلبات");
+    setBlockBusyPhone(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setLocalOrders((prev) => prev.map((o) => (o.customer?.phone === phone ? { ...o, isBlocked: true } : o)));
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -78,6 +93,8 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
+
+      {canManage && <BlockedPhonesPanel orgId={orgId} />}
 
       {localOrders.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-16 text-center">
@@ -91,13 +108,38 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
             <div key={order.id} className="p-5">
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    {order.customer?.name ?? "زبون"}
-                  </p>
-                  {order.customer?.phone && (
-                    <p className="text-xs text-slate-400" dir="ltr">
-                      {order.customer.phone}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {order.customer?.name ?? "زبون"}
                     </p>
+                    {order.isBlocked && (
+                      <Badge variant="danger">
+                        <ShieldOff size={11} className="ml-1" />
+                        محظور
+                      </Badge>
+                    )}
+                    {!order.isBlocked && order.canceledCount >= 2 && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        <ShieldAlert size={11} />
+                        {order.canceledCount} طلبات ملغاة سابقًا
+                      </span>
+                    )}
+                  </div>
+                  {order.customer?.phone && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-slate-400" dir="ltr">
+                        {order.customer.phone}
+                      </p>
+                      {canManage && !order.isBlocked && (
+                        <button
+                          onClick={() => handleBlockPhone(order.customer!.phone!)}
+                          disabled={blockBusyPhone === order.customer.phone}
+                          className="text-[11px] text-red-500 hover:text-red-600 underline"
+                        >
+                          حظر هذا الرقم
+                        </button>
+                      )}
+                    </div>
                   )}
                   <p className="text-xs text-slate-400 mt-1">
                     {new Date(order.createdAt).toLocaleDateString("ar-DZ")}
@@ -167,6 +209,104 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlockedPhonesPanel({ orgId }: { orgId: string }) {
+  const [open, setOpen] = useState(false);
+  const [phones, setPhones] = useState<{ id: string; phone: string; reason: string | null; createdAt: Date }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [newPhone, setNewPhone] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function load() {
+    const result = await getBlockedPhonesAction(orgId);
+    if (result.success) setPhones(result.data);
+    setLoaded(true);
+  }
+
+  useEffect(() => {
+    if (open && !loaded) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  async function handleAdd() {
+    if (!newPhone.trim()) return;
+    setAdding(true);
+    const result = await blockPhoneAction(orgId, newPhone.trim());
+    setAdding(false);
+    if (result.success) {
+      setNewPhone("");
+      load();
+    }
+  }
+
+  async function handleUnblock(id: string) {
+    setBusyId(id);
+    const result = await unblockPhoneAction(orgId, id);
+    setBusyId(null);
+    if (result.success) setPhones((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <span className="flex items-center gap-2">
+          <Ban size={15} className="text-red-500" />
+          الأرقام المحظورة (حماية من الطلبات الوهمية)
+        </span>
+        <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 border-t border-slate-50 pt-4 space-y-3">
+          <div className="flex gap-2">
+            <input
+              value={newPhone}
+              onChange={(e) => setNewPhone(e.target.value)}
+              placeholder="0555xxxxxx"
+              dir="ltr"
+              className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={adding}
+              className="px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50"
+            >
+              حظر
+            </button>
+          </div>
+
+          {!loaded ? (
+            <p className="text-xs text-slate-400">جارٍ التحميل...</p>
+          ) : phones.length === 0 ? (
+            <p className="text-xs text-slate-400">ما فيه أرقام محظورة عندك حاليًا</p>
+          ) : (
+            <div className="space-y-1.5">
+              {phones.map((p) => (
+                <div key={p.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-sm text-slate-700" dir="ltr">{p.phone}</p>
+                    {p.reason && <p className="text-xs text-slate-400">{p.reason}</p>}
+                  </div>
+                  <button
+                    onClick={() => handleUnblock(p.id)}
+                    disabled={busyId === p.id}
+                    className="text-xs text-slate-400 hover:text-red-500"
+                  >
+                    إلغاء الحظر
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
