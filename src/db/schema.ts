@@ -84,6 +84,24 @@ export const organizations = pgTable(
   (t) => [uniqueIndex("organizations_slug_idx").on(t.slug)]
 );
 
+// ─── Notifications (إشعارات داخلية للوحة التحكم) ───────────────────────────────
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // order | member | system
+    title: text("title").notNull(),
+    message: text("message"),
+    link: text("link"),
+    isRead: boolean("is_read").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("notifications_org_idx").on(t.organizationId)]
+);
+
 // ─── Memberships ──────────────────────────────────────────────────────────────
 export const memberships = pgTable(
   "memberships",
