@@ -7,9 +7,9 @@ import { ShieldCheck, LayoutDashboard, Store, Users, LogOut, Menu, X } from "luc
 import { logoutAction } from "@/actions/auth";
 
 const navItems = [
-  { label: "نظرة عامة", href: "/admin", icon: LayoutDashboard },
-  { label: "المتاجر", href: "/admin/stores", icon: Store },
-  { label: "المستخدمون", href: "/admin/users", icon: Users },
+  { label: "نظرة عامة", href: "/", icon: LayoutDashboard },
+  { label: "المتاجر", href: "/stores", icon: Store },
+  { label: "المستخدمون", href: "/users", icon: Users },
 ];
 
 function SidebarContent({ email, onNavigate }: { email: string; onNavigate?: () => void }) {
