@@ -9,6 +9,31 @@ cloudinary.config({
 
 export { cloudinary };
 
+/**
+ * يحذف كل الصور من حساب Cloudinary مُعطى (عبر REST API مباشرة، بدون التأثير
+ * على إعداد Cloudinary العام). آمن الاستخدام فقط مع حسابات معزولة خاصة بمتجر
+ * واحد — لا يُستخدم أبدًا مع الحساب المشترك لأنه سيمسح صور كل المتاجر الأخرى.
+ */
+export async function purgeCloudinaryAccount(credentials: {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const auth = Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString("base64");
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${credentials.cloudName}/resources/image/upload?all=true`,
+      { method: "DELETE", headers: { Authorization: `Basic ${auth}` } }
+    );
+    if (!res.ok) {
+      return { success: false, error: `فشل حذف صور Cloudinary (${res.status})` };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "فشل الاتصال بـ Cloudinary" };
+  }
+}
+
 interface CloudinaryCredentials {
   cloudName: string;
   apiKey: string;

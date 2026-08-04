@@ -134,8 +134,11 @@ export function BillingClient({
         <h2 className="text-lg font-semibold text-slate-900 mb-4">الخطط المتاحة</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {planDetails.map((p) => {
+            const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, business: 2 };
             const isCurrent = p.key === plan;
             const isPro = p.key === "pro";
+            const isHigherThanCurrent = PLAN_RANK[p.key] > PLAN_RANK[plan];
+            const isLowerThanCurrent = PLAN_RANK[p.key] < PLAN_RANK[plan];
 
             return (
               <div
@@ -171,7 +174,7 @@ export function BillingClient({
                   <div className="text-center py-2 px-4 bg-slate-100 rounded-xl text-sm font-medium text-slate-600">
                     خطتك الحالية
                   </div>
-                ) : p.key !== "free" ? (
+                ) : isHigherThanCurrent ? (
                   <Button
                     className="w-full"
                     variant={isPro ? "primary" : "secondary"}
@@ -181,6 +184,10 @@ export function BillingClient({
                     <Zap size={14} />
                     الترقية الآن
                   </Button>
+                ) : isLowerThanCurrent ? (
+                  <div className="text-center py-2 px-4 rounded-xl text-sm text-slate-400 border border-dashed border-slate-200">
+                    أقل من خطتك الحالية
+                  </div>
                 ) : (
                   <div className="text-center py-2 px-4 rounded-xl text-sm text-slate-400">
                     —

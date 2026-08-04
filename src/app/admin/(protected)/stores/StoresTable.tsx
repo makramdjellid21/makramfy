@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { adminSetStorePlanAction, adminSetStoreCloudinaryAction } from "@/actions/admin";
-import { ExternalLink, Cloud, X } from "lucide-react";
+import { adminSetStorePlanAction, adminSetStoreCloudinaryAction, adminDeleteStoreAction } from "@/actions/admin";
+import { ExternalLink, Cloud, X, Trash2, AlertTriangle } from "lucide-react";
 
 interface Store {
   id: string;
@@ -34,6 +34,7 @@ export function StoresTable({ stores }: { stores: Store[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localStores, setLocalStores] = useState(stores);
   const [cloudinaryStoreId, setCloudinaryStoreId] = useState<string | null>(null);
+  const [deleteStoreId, setDeleteStoreId] = useState<string | null>(null);
 
   async function handlePlanChange(orgId: string, plan: string) {
     setBusyId(orgId);
@@ -47,6 +48,7 @@ export function StoresTable({ stores }: { stores: Store[] }) {
   }
 
   const activeStore = localStores.find((s) => s.id === cloudinaryStoreId) ?? null;
+  const deleteTarget = localStores.find((s) => s.id === deleteStoreId) ?? null;
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800">
@@ -87,6 +89,13 @@ export function StoresTable({ stores }: { stores: Store[] }) {
                 }`}
               >
                 <Cloud size={15} />
+              </button>
+              <button
+                onClick={() => setDeleteStoreId(store.id)}
+                title="حذف المتجر"
+                className="h-8 w-8 rounded-lg flex items-center justify-center border bg-slate-800 border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors"
+              >
+                <Trash2 size={15} />
               </button>
               <Badge variant={PLAN_VARIANT[store.subscription?.plan ?? "free"]}>
                 {PLAN_LABELS[store.subscription?.plan ?? "free"]}
@@ -131,6 +140,17 @@ export function StoresTable({ stores }: { stores: Store[] }) {
               )
             );
             setCloudinaryStoreId(null);
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteStorePanel
+          store={deleteTarget}
+          onClose={() => setDeleteStoreId(null)}
+          onDeleted={() => {
+            setLocalStores((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+            setDeleteStoreId(null);
           }}
         />
       )}
@@ -234,6 +254,126 @@ function CloudinaryPanel({
             مسح
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteStorePanel({
+  store,
+  onClose,
+  onDeleted,
+}: {
+  store: Store;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+  const [purgeCloudinary, setPurgeCloudinary] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const [resultNote, setResultNote] = useState("");
+
+  const hasCustomCloudinary = Boolean(store.storeSettings?.cloudinaryCloudName);
+  const canConfirm = confirmText.trim() === store.name;
+
+  async function handleDelete() {
+    if (!canConfirm) return;
+    setDeleting(true);
+    setError("");
+
+    const result = await adminDeleteStoreAction(store.id, purgeCloudinary);
+
+    if (!result.success) {
+      setDeleting(false);
+      setError(result.error);
+      return;
+    }
+
+    if (purgeCloudinary && result.data.cloudinarySkippedReason) {
+      // نعرض للأدمن سبب تخطي حذف Cloudinary قبل إغلاق النافذة نهائيًا
+      setResultNote(result.data.cloudinarySkippedReason);
+      setDeleting(false);
+      setTimeout(onDeleted, 2500);
+      return;
+    }
+
+    onDeleted();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+      <div
+        className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 w-full max-w-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-white flex items-center gap-2">
+            <AlertTriangle size={16} className="text-red-500" />
+            حذف {store.name}
+          </h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+            <X size={18} />
+          </button>
+        </div>
+
+        {resultNote ? (
+          <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mt-4">
+            تم حذف المتجر من قاعدة البيانات. {resultNote}
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-400 mt-2 mb-4 leading-relaxed">
+              هذا الإجراء <span className="text-red-400 font-semibold">نهائي ولا يمكن التراجع عنه</span> — سيُحذف
+              المتجر وكل بياناته (المنتجات، الطلبات، الأعضاء، الإعدادات) نهائيًا.
+            </p>
+
+            {error && <p className="text-xs text-red-400 mb-3 bg-red-500/10 border border-red-500/20 rounded-lg p-2">{error}</p>}
+
+            <label className="flex items-start gap-2 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={purgeCloudinary}
+                onChange={(e) => setPurgeCloudinary(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-xs text-slate-400">
+                حذف صور المتجر من Cloudinary أيضًا
+                {!hasCustomCloudinary && (
+                  <span className="block text-amber-500 mt-0.5">
+                    ⚠️ هذا المتجر على الحساب المشترك — لن تُحذف الصور فعليًا (تفاديًا للتأثير على متاجر أخرى)، فقط بيانات قاعدة البيانات
+                  </span>
+                )}
+              </span>
+            </label>
+
+            <label className="text-xs text-slate-400 block mb-1">
+              اكتب اسم المتجر <span className="text-white font-semibold">{store.name}</span> للتأكيد
+            </label>
+            <input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              dir="ltr"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-red-500 mb-5"
+              placeholder={store.name}
+            />
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleDelete}
+                loading={deleting}
+                disabled={!canConfirm}
+                className="flex-1 !bg-red-600 hover:!bg-red-700 disabled:opacity-40"
+              >
+                <Trash2 size={14} />
+                حذف نهائي
+              </Button>
+              <Button variant="outline" onClick={onClose} type="button">
+                إلغاء
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

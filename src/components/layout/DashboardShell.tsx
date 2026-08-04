@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 
@@ -44,22 +44,13 @@ export function DashboardShell({ user, organizations, currentOrgSlug, children }
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="absolute top-0 right-0 h-full w-72 max-w-[85vw] shadow-xl">
-            <div className="relative h-full">
-              <button
-                onClick={() => setOpen(false)}
-                className="absolute top-4 left-3 h-9 w-9 rounded-lg flex items-center justify-center hover:bg-slate-100 z-10"
-              >
-                <X size={18} className="text-slate-500" />
-              </button>
-              <div className="h-full">
-                <DashboardSidebar
-                  user={user}
-                  organizations={organizations}
-                  currentOrgSlug={currentOrgSlug}
-                  onNavigate={() => setOpen(false)}
-                />
-              </div>
-            </div>
+            <DashboardSidebar
+              user={user}
+              organizations={organizations}
+              currentOrgSlug={currentOrgSlug}
+              onNavigate={() => setOpen(false)}
+              onClose={() => setOpen(false)}
+            />
           </div>
         </div>
       )}

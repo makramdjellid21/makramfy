@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { organizations, subscriptions, users, products, orders, storeSettings } from "@/db/schema";
 import { eq, count, desc } from "drizzle-orm";
 import { getPlatformAdmin } from "@/lib/admin-auth";
+import { purgeCloudinaryAccount } from "@/lib/cloudinary";
 import type { ActionResult } from "./auth";
 import { revalidatePath } from "next/cache";
 
@@ -58,7 +59,46 @@ export async function getAllUsers() {
   });
 }
 
-// ─── إجراء إشرافي: تغيير خطة متجر يدويًا (مثلاً تعليق متجر مخالف بإرجاعه Free) ──
+// ─── حذف متجر (يشمل كل بياناته بقاعدة البيانات تلقائيًا عبر cascade) ───────────
+export async function adminDeleteStoreAction(
+  orgId: string,
+  purgeCloudinary: boolean
+): Promise<ActionResult<{ cloudinaryPurged: boolean; cloudinarySkippedReason?: string }>> {
+  const admin = await getPlatformAdmin();
+  if (!admin) return { success: false, error: "غير مصرح" };
+
+  let cloudinaryPurged = false;
+  let cloudinarySkippedReason: string | undefined;
+
+  if (purgeCloudinary) {
+    const [settings] = await db
+      .select()
+      .from(storeSettings)
+      .where(eq(storeSettings.organizationId, orgId));
+
+    if (settings?.cloudinaryCloudName && settings.cloudinaryApiKey && settings.cloudinaryApiSecret) {
+      // حساب Cloudinary معزول خاص بهذا المتجر — آمن حذف كل شيء فيه
+      const result = await purgeCloudinaryAccount({
+        cloudName: settings.cloudinaryCloudName,
+        apiKey: settings.cloudinaryApiKey,
+        apiSecret: settings.cloudinaryApiSecret,
+      });
+      cloudinaryPurged = result.success;
+      if (!result.success) cloudinarySkippedReason = result.error;
+    } else {
+      // هذا المتجر على الحساب المشترك — لا يمكن حذف صوره بدون التأثير
+      // على صور بقية المتاجر الأخرى على نفس الحساب، فنتجاهل هذه الخطوة عمدًا.
+      cloudinarySkippedReason = "هذا المتجر يستخدم حساب Cloudinary المشترك — لا يمكن حذف صوره بأمان بدون التأثير على متاجر أخرى";
+    }
+  }
+
+  // حذف المتجر من قاعدة البيانات يحذف تلقائيًا: المنتجات، الطلبات، الأعضاء،
+  // الدعوات، الاشتراك، الإعدادات، الإشعارات... (كلها onDelete: cascade)
+  await db.delete(organizations).where(eq(organizations.id, orgId));
+
+  revalidatePath("/admin/stores");
+  return { success: true, data: { cloudinaryPurged, cloudinarySkippedReason } };
+}
 export async function adminSetStorePlanAction(
   orgId: string,
   plan: "free" | "pro" | "business"

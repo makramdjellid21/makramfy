@@ -12,6 +12,12 @@ import {
   ChevronDown,
   Plus,
   LogOut,
+  X,
+  Info,
+  Palette,
+  Megaphone,
+  FileText,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
@@ -46,6 +52,7 @@ interface DashboardSidebarProps {
   organizations: SidebarOrg[];
   currentOrgSlug?: string;
   onNavigate?: () => void;
+  onClose?: () => void;
 }
 
 export function DashboardSidebar({
@@ -53,17 +60,18 @@ export function DashboardSidebar({
   organizations,
   currentOrgSlug,
   onNavigate,
+  onClose,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [orgOpen, setOrgOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const settingsTabs = [
-    { id: "general", label: "عام" },
-    { id: "appearance", label: "المظهر والتواصل" },
-    { id: "promo", label: "الترويج والتواصل الاجتماعي" },
-    { id: "legal", label: "الصفحات القانونية" },
-    { id: "marketing", label: "التسويق" },
+    { id: "general", label: "المعلومات العامة", icon: Info },
+    { id: "appearance", label: "المظهر والتواصل", icon: Palette },
+    { id: "promo", label: "الترويج والتواصل الاجتماعي", icon: Megaphone },
+    { id: "legal", label: "الصفحات القانونية", icon: FileText },
+    { id: "marketing", label: "التسويق والتكاملات", icon: TrendingUp },
   ];
 
   const currentOrg = organizations.find((o) => o.slug === currentOrgSlug) ?? organizations[0];
@@ -120,7 +128,18 @@ export function DashboardSidebar({
             Makram<span className="text-violet-600">Fy</span>
           </span>
         </Link>
-        {currentOrg && <NotificationBell orgId={currentOrg.id} />}
+        <div className="flex items-center gap-1">
+          {currentOrg && <NotificationBell orgId={currentOrg.id} />}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-slate-100 shrink-0"
+              aria-label="إغلاق"
+            >
+              <X size={18} className="text-slate-500" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Org Switcher */}
@@ -212,8 +231,9 @@ export function DashboardSidebar({
                         key={tab.id}
                         href={`${item.href}?tab=${tab.id}`}
                         onClick={onNavigate}
-                        className="block px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
                       >
+                        <tab.icon size={13} className="text-slate-400 shrink-0" />
                         {tab.label}
                       </Link>
                     ))}
