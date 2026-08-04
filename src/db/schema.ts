@@ -102,25 +102,6 @@ export const notifications = pgTable(
   (t) => [index("notifications_org_idx").on(t.organizationId)]
 );
 
-// ─── القائمة السوداء لأرقام الهواتف (حماية من الطلبات الوهمية) ─────────────────
-// إن كان organizationId فارغًا = حظر على مستوى المنصة كلها (يديره الأدمن فقط).
-// إن كان محددًا = حظر خاص بمتجر واحد فقط (يديره صاحب المتجر).
-export const blockedPhones = pgTable(
-  "blocked_phones",
-  {
-    id: text("id").primaryKey(),
-    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
-    phone: text("phone").notNull(),
-    reason: text("reason"),
-    reportedByOrgId: text("reported_by_org_id"), // أي متجر بلّغ عن هذا الرقم (لسياق العرض فقط)
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (t) => [
-    index("blocked_phones_org_idx").on(t.organizationId),
-    index("blocked_phones_phone_idx").on(t.phone),
-  ]
-);
-
 // ─── Memberships ──────────────────────────────────────────────────────────────
 export const memberships = pgTable(
   "memberships",
@@ -344,6 +325,41 @@ export const orders = pgTable(
   ]
 );
 
+// ─── Blocked Phones (حماية من الطلبات الوهمية COD) ─────────────────────────────
+// organizationId = null  →  حظر على مستوى المنصة كلها (كل المتاجر)
+// organizationId = معرّف  →  حظر خاص بمتجر واحد فقط
+export const blockedPhones = pgTable(
+  "blocked_phones",
+  {
+    id: text("id").primaryKey(),
+    phone: text("phone").notNull(),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    reason: text("reason"),
+    blockedByUserId: text("blocked_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("blocked_phones_phone_idx").on(t.phone),
+    index("blocked_phones_org_idx").on(t.organizationId),
+  ]
+);
+
+// ─── Login Attempts (Rate limiting لتسجيل الدخول) ──────────────────────────────
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: text("id").primaryKey(),
+    // مفتاح التحديد: IP أو IP+email مجمّعين معًا (نخزّن سلسلة جاهزة لتفادي join)
+    identifierKey: text("identifier_key").notNull(),
+    success: boolean("success").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("login_attempts_key_idx").on(t.identifierKey),
+    index("login_attempts_created_idx").on(t.createdAt),
+  ]
+);
+
 // ─── Order Items ──────────────────────────────────────────────────────────────
 export const orderItems = pgTable(
   "order_items",
@@ -493,6 +509,17 @@ export const usageRecordsRelations = relations(usageRecords, ({ one }) => ({
   organization: one(organizations, {
     fields: [usageRecords.organizationId],
     references: [organizations.id],
+  }),
+}));
+
+export const blockedPhonesRelations = relations(blockedPhones, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [blockedPhones.organizationId],
+    references: [organizations.id],
+  }),
+  blockedBy: one(users, {
+    fields: [blockedPhones.blockedByUserId],
+    references: [users.id],
   }),
 }));
 

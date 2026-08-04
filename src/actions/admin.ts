@@ -1,11 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { organizations, subscriptions, users, products, orders, storeSettings, blockedPhones } from "@/db/schema";
-import { eq, and, count, countDistinct, desc, isNull, sql } from "drizzle-orm";
+import { organizations, subscriptions, users, products, orders, storeSettings } from "@/db/schema";
+import { eq, count, desc } from "drizzle-orm";
 import { getPlatformAdmin } from "@/lib/admin-auth";
 import { purgeCloudinaryAccount } from "@/lib/cloudinary";
-import { generateId } from "@/lib/utils";
 import type { ActionResult } from "./auth";
 import { revalidatePath } from "next/cache";
 
@@ -147,73 +146,5 @@ export async function adminSetStoreCloudinaryAction(
     .where(eq(storeSettings.organizationId, orgId));
 
   revalidatePath("/admin/stores");
-  return { success: true, data: undefined };
-}
-
-// ─── القائمة السوداء على مستوى المنصة كلها (حماية من الطلبات الوهمية) ──────────
-export async function getPlatformBlockedPhonesAction(): Promise<
-  ActionResult<{ id: string; phone: string; reason: string | null; createdAt: Date }[]>
-> {
-  const admin = await getPlatformAdmin();
-  if (!admin) return { success: false, error: "غير مصرح" };
-
-  const rows = await db
-    .select()
-    .from(blockedPhones)
-    .where(isNull(blockedPhones.organizationId))
-    .orderBy(desc(blockedPhones.createdAt));
-
-  return { success: true, data: rows };
-}
-
-/** أرقام حظرتها أكثر من متجر مستقل — مؤشر قوي إنها فعلًا محتالة، مرشّحة للحظر الشامل. */
-export async function getMultiReportedPhonesAction(): Promise<
-  ActionResult<{ phone: string; storeCount: number }[]>
-> {
-  const admin = await getPlatformAdmin();
-  if (!admin) return { success: false, error: "غير مصرح" };
-
-  const rows = await db
-    .select({ phone: blockedPhones.phone, storeCount: countDistinct(blockedPhones.organizationId) })
-    .from(blockedPhones)
-    .where(sql`${blockedPhones.organizationId} is not null`)
-    .groupBy(blockedPhones.phone)
-    .having(sql`count(distinct ${blockedPhones.organizationId}) >= 2`)
-    .orderBy(desc(countDistinct(blockedPhones.organizationId)));
-
-  return { success: true, data: rows };
-}
-
-export async function adminBlockPhonePlatformWideAction(phone: string, reason?: string): Promise<ActionResult> {
-  const admin = await getPlatformAdmin();
-  if (!admin) return { success: false, error: "غير مصرح" };
-
-  const cleanPhone = phone.trim();
-  if (!cleanPhone) return { success: false, error: "رقم الهاتف مطلوب" };
-
-  const [existing] = await db
-    .select()
-    .from(blockedPhones)
-    .where(and(isNull(blockedPhones.organizationId), eq(blockedPhones.phone, cleanPhone)));
-  if (existing) return { success: true, data: undefined };
-
-  await db.insert(blockedPhones).values({
-    id: generateId(),
-    organizationId: null,
-    phone: cleanPhone,
-    reason: reason?.trim() || "حظر شامل من الأدمن",
-  });
-
-  revalidatePath("/admin");
-  return { success: true, data: undefined };
-}
-
-export async function adminUnblockPhonePlatformWideAction(id: string): Promise<ActionResult> {
-  const admin = await getPlatformAdmin();
-  if (!admin) return { success: false, error: "غير مصرح" };
-
-  await db.delete(blockedPhones).where(and(eq(blockedPhones.id, id), isNull(blockedPhones.organizationId)));
-
-  revalidatePath("/admin");
   return { success: true, data: undefined };
 }

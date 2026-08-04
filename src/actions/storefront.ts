@@ -10,9 +10,8 @@ import {
   orderItems,
   productVariants,
   subscriptions,
-  blockedPhones,
 } from "@/db/schema";
-import { eq, and, or, isNull, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils";
 import { createChargilyCheckout } from "@/lib/chargily";
 import { getDeliveryPrice, getWilaya } from "@/lib/wilayas";
@@ -20,6 +19,7 @@ import { sendTelegramMessage, formatOrderNotification } from "@/lib/telegram";
 import { createNotification } from "./notifications";
 import type { ActionResult } from "./auth";
 import { revalidatePath } from "next/cache";
+import { checkPhoneBlocked, checkOrderVelocity } from "@/lib/security";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000";
 
@@ -121,36 +121,29 @@ export async function createOrderAction(
     return { success: false, error: "السلة فارغة" };
   }
 
+  // ─── حماية من الطلبات الوهمية (COD) ────────────────────────────────────────
+  // 1) رقم محظور (على مستوى هذا المتجر أو على مستوى المنصة كلها) → نرفض الطلب فورًا
+  const blockCheck = await checkPhoneBlocked(organizationId, customerInfo.phone);
+  if (blockCheck.blocked) {
+    return {
+      success: false,
+      error: "تعذّر إتمام الطلب بهذا الرقم. إذا كنت تعتقد أن هذا خطأ، يرجى التواصل مع المتجر مباشرة",
+    };
+  }
+
+  // 2) سرعة طلبات غير طبيعية من نفس الرقم عبر كل المنصة (بوت/محاولات متكررة) → نمنع مؤقتًا
+  const velocity = await checkOrderVelocity(customerInfo.phone);
+  if (velocity.suspicious) {
+    return {
+      success: false,
+      error: "لقد قمت بعدة طلبات مؤخرًا من هذا الرقم. يرجى الانتظار قليلاً قبل المحاولة مجددًا",
+    };
+  }
+
   const wilaya = getWilaya(customerInfo.wilayaCode);
   if (!wilaya) {
     return { success: false, error: "الولاية غير صحيحة" };
   }
-
-  // ─── الحماية من الطلبات الوهمية ─────────────────────────────────────────────
-  const phone = customerInfo.phone.trim();
-
-  // 1) رقم محظور (على مستوى هذا المتجر أو على مستوى المنصة كلها)
-  const [blocked] = await db
-    .select()
-    .from(blockedPhones)
-    .where(and(eq(blockedPhones.phone, phone), or(eq(blockedPhones.organizationId, organizationId), isNull(blockedPhones.organizationId))));
-
-  if (blocked) {
-    return { success: false, error: "تعذّر إتمام الطلب. يرجى التواصل مباشرة مع المتجر لإتمام عملية الشراء." };
-  }
-
-  // 2) عدد كبير من الطلبات بوقت قصير من نفس الرقم (نمط بوت/إزعاج متكرر)
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const [recentCount] = await db
-    .select({ value: sql<number>`count(*)` })
-    .from(orders)
-    .innerJoin(customers, eq(orders.customerId, customers.id))
-    .where(and(eq(customers.phone, phone), sql`${orders.createdAt} > ${oneHourAgo}`));
-
-  if (Number(recentCount?.value ?? 0) >= 4) {
-    return { success: false, error: "لقد قمت بعدد كبير من الطلبات مؤخرًا. يرجى المحاولة لاحقًا أو التواصل مع المتجر." };
-  }
-
   const deliveryPriceDzd = getDeliveryPrice(customerInfo.wilayaCode, customerInfo.deliveryType) ?? 0;
   const deliveryPriceCents = Math.round(deliveryPriceDzd * 100);
 

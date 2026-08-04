@@ -19,6 +19,15 @@ import {
 } from "@/lib/auth";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { generateId } from "@/lib/utils";
+import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/security";
+import { headers } from "next/headers";
+
+async function getClientIp(): Promise<string> {
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return h.get("x-real-ip") ?? "unknown";
+}
 
 const registerSchema = z.object({
   name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
@@ -85,15 +94,37 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
 
   const { email, password } = parsed.data;
 
+  // Rate limiting: نحسب المحاولات حسب IP + البريد معًا حتى نمنع كل من:
+  // (أ) بوت يجرب آلاف كلمات المرور على نفس البريد، و(ب) بوت يجرب من نفس الـIP على حسابات متعددة.
+  const ip = await getClientIp();
+  const ipKey = `ip:${ip}`;
+  const emailKey = `email:${email}`;
+
+  const [ipLimit, emailLimit] = await Promise.all([
+    checkLoginRateLimit(ipKey),
+    checkLoginRateLimit(emailKey),
+  ]);
+
+  if (!ipLimit.allowed || !emailLimit.allowed) {
+    return {
+      success: false,
+      error: "محاولات دخول كثيرة جدًا. يرجى الانتظار بضع دقائق ثم إعادة المحاولة",
+    };
+  }
+
   const [user] = await db.select().from(users).where(eq(users.email, email));
   if (!user || !user.passwordHash) {
+    await Promise.all([recordLoginAttempt(ipKey, false), recordLoginAttempt(emailKey, false)]);
     return { success: false, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" };
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
+    await Promise.all([recordLoginAttempt(ipKey, false), recordLoginAttempt(emailKey, false)]);
     return { success: false, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" };
   }
+
+  await Promise.all([recordLoginAttempt(ipKey, true), recordLoginAttempt(emailKey, true)]);
 
   const sessionId = await createSession(user.id);
   await setSessionCookie(sessionId);

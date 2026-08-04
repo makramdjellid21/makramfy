@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDashboardData } from "@/actions/organizations";
 import { getOrders } from "@/actions/orders";
+import { getBlockedPhonesForOrg } from "@/actions/security";
 import { OrdersClient } from "./OrdersClient";
 
 interface PageProps {
@@ -17,11 +18,19 @@ export default async function OrdersPage({ params }: PageProps) {
   if (!data) notFound();
 
   const { org, membership } = data;
-  const orderList = await getOrders(org.id);
+  const [orderList, blockedPhonesList] = await Promise.all([
+    getOrders(org.id),
+    getBlockedPhonesForOrg(org.id),
+  ]);
 
   return (
     <div className="max-w-6xl mx-auto">
-      <OrdersClient orgId={org.id} orders={orderList} myRole={membership.role} />
+      <OrdersClient
+        orgId={org.id}
+        orders={orderList}
+        blockedPhones={blockedPhonesList}
+        myRole={membership.role}
+      />
     </div>
   );
 }

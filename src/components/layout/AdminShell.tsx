@@ -3,14 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ShieldCheck, LayoutDashboard, Store, Users, Ban, LogOut, Menu, X } from "lucide-react";
+import { ShieldCheck, LayoutDashboard, Store, Users, LogOut, Menu, X, ShieldBan } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 
 const navItems = [
   { label: "نظرة عامة", href: "/", icon: LayoutDashboard },
   { label: "المتاجر", href: "/stores", icon: Store },
   { label: "المستخدمون", href: "/users", icon: Users },
-  { label: "الحماية من الاحتيال", href: "/blocked-phones", icon: Ban },
+  { label: "الحماية من الاحتيال", href: "/fraud", icon: ShieldBan },
 ];
 
 function SidebarContent({ email, onNavigate }: { email: string; onNavigate?: () => void }) {
