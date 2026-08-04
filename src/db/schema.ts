@@ -360,6 +360,22 @@ export const loginAttempts = pgTable(
   ]
 );
 
+// ─── Checkout Attempts (Rate limiting على إنشاء الطلبات حسب IP) ───────────────
+// يمنع بوت من إغراق متجر بطلبات وهمية بأرقام هواتف مختلفة من نفس الجهاز —
+// وهي ثغرة لا يغطيها فحص سرعة الرقم (checkOrderVelocity) لأنه مبني على الهاتف فقط.
+export const checkoutAttempts = pgTable(
+  "checkout_attempts",
+  {
+    id: text("id").primaryKey(),
+    identifierKey: text("identifier_key").notNull(), // ip:x.x.x.x
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("checkout_attempts_key_idx").on(t.identifierKey),
+    index("checkout_attempts_created_idx").on(t.createdAt),
+  ]
+);
+
 // ─── Order Items ──────────────────────────────────────────────────────────────
 export const orderItems = pgTable(
   "order_items",

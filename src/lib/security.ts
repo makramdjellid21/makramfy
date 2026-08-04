@@ -1,6 +1,15 @@
 import { db } from "@/db";
-import { blockedPhones, orders, customers, loginAttempts } from "@/db/schema";
+import { blockedPhones, orders, customers, loginAttempts, checkoutAttempts } from "@/db/schema";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { headers } from "next/headers";
+
+// ─── عنوان IP الحقيقي للطالب (خلف أي proxy/CDN) ────────────────────────────────
+export async function getClientIp(): Promise<string> {
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return h.get("x-real-ip") ?? "unknown";
+}
 
 // ─── تطبيع رقم الهاتف ───────────────────────────────────────────────────────
 // نوحّد الشكل (نحذف المسافات/الشرطات، ونحوّل 0xxxxxxxxx و +213xxxxxxxxx لنفس
@@ -108,5 +117,43 @@ export async function recordLoginAttempt(identifierKey: string, success: boolean
     await db.delete(loginAttempts).where(sql`${loginAttempts.createdAt} < ${cutoff}`);
   } catch {
     // تنظيف اختياري، ما نوقف تسجيل الدخول لو فشل
+  }
+}
+
+// ─── Rate limiting على إنشاء الطلبات (checkout) حسب IP ─────────────────────────
+// يمنع بوت من إغراق أي متجر بطلبات وهمية عبر أرقام هواتف عشوائية مختلفة —
+// فحص السرعة حسب الرقم (checkOrderVelocity) وحده لا يكفي لأنه ينطلي فقط
+// على من يعيد استخدام نفس الرقم.
+const CHECKOUT_WINDOW_MINUTES = 10;
+const CHECKOUT_MAX_ATTEMPTS = 6;
+
+export async function checkCheckoutRateLimit(
+  identifierKey: string
+): Promise<{ allowed: boolean; retryAfterMinutes: number }> {
+  const since = new Date(Date.now() - CHECKOUT_WINDOW_MINUTES * 60 * 1000);
+
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(checkoutAttempts)
+    .where(and(eq(checkoutAttempts.identifierKey, identifierKey), gte(checkoutAttempts.createdAt, since)));
+
+  const count = row?.count ?? 0;
+  return {
+    allowed: count < CHECKOUT_MAX_ATTEMPTS,
+    retryAfterMinutes: CHECKOUT_WINDOW_MINUTES,
+  };
+}
+
+export async function recordCheckoutAttempt(identifierKey: string) {
+  await db.insert(checkoutAttempts).values({
+    id: crypto.randomUUID(),
+    identifierKey,
+  });
+
+  try {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.delete(checkoutAttempts).where(sql`${checkoutAttempts.createdAt} < ${cutoff}`);
+  } catch {
+    // تنظيف اختياري، ما نوقف الطلب لو فشل
   }
 }

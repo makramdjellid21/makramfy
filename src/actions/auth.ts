@@ -19,15 +19,7 @@ import {
 } from "@/lib/auth";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { generateId } from "@/lib/utils";
-import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/security";
-import { headers } from "next/headers";
-
-async function getClientIp(): Promise<string> {
-  const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for");
-  if (forwardedFor) return forwardedFor.split(",")[0].trim();
-  return h.get("x-real-ip") ?? "unknown";
-}
+import { checkLoginRateLimit, recordLoginAttempt, getClientIp } from "@/lib/security";
 
 const registerSchema = z.object({
   name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),

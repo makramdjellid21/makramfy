@@ -19,7 +19,7 @@ import { sendTelegramMessage, formatOrderNotification } from "@/lib/telegram";
 import { createNotification } from "./notifications";
 import type { ActionResult } from "./auth";
 import { revalidatePath } from "next/cache";
-import { checkPhoneBlocked, checkOrderVelocity } from "@/lib/security";
+import { checkPhoneBlocked, checkOrderVelocity, checkCheckoutRateLimit, recordCheckoutAttempt, getClientIp } from "@/lib/security";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000";
 
@@ -122,6 +122,18 @@ export async function createOrderAction(
   }
 
   // ─── حماية من الطلبات الوهمية (COD) ────────────────────────────────────────
+  // 0) Rate limiting حسب IP: يمنع بوت من إغراق المتجر بطلبات وهمية بأرقام مختلفة
+  const ip = await getClientIp();
+  const ipKey = `ip:${ip}`;
+  const ipLimit = await checkCheckoutRateLimit(ipKey);
+  if (!ipLimit.allowed) {
+    return {
+      success: false,
+      error: "عدد كبير من الطلبات من نفس الجهاز خلال وقت قصير. يرجى الانتظار قليلاً ثم إعادة المحاولة",
+    };
+  }
+  await recordCheckoutAttempt(ipKey);
+
   // 1) رقم محظور (على مستوى هذا المتجر أو على مستوى المنصة كلها) → نرفض الطلب فورًا
   const blockCheck = await checkPhoneBlocked(organizationId, customerInfo.phone);
   if (blockCheck.blocked) {
