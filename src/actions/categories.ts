@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withOrgContext } from "@/db";
 import { categories, memberships } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
@@ -19,11 +19,9 @@ async function getMembership(userId: string, orgId: string) {
 }
 
 export async function getCategories(orgId: string) {
-  return db
-    .select()
-    .from(categories)
-    .where(eq(categories.organizationId, orgId))
-    .orderBy(asc(categories.name));
+  return withOrgContext(orgId, (tx) =>
+    tx.select().from(categories).where(eq(categories.organizationId, orgId)).orderBy(asc(categories.name))
+  );
 }
 
 export async function createCategoryAction(
@@ -40,24 +38,26 @@ export async function createCategoryAction(
     return { success: false, error: "اسم التصنيف يجب أن يكون حرفين على الأقل" };
   }
 
-  const baseSlug = generateSlug(name);
-  let slug = baseSlug;
-  let attempt = 0;
-  while (true) {
-    const [existing] = await db
-      .select()
-      .from(categories)
-      .where(and(eq(categories.organizationId, orgId), eq(categories.slug, slug)));
-    if (!existing) break;
-    attempt++;
-    slug = `${baseSlug}-${attempt}`;
-  }
+  return withOrgContext(orgId, async (tx) => {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let attempt = 0;
+    while (true) {
+      const [existing] = await tx
+        .select()
+        .from(categories)
+        .where(and(eq(categories.organizationId, orgId), eq(categories.slug, slug)));
+      if (!existing) break;
+      attempt++;
+      slug = `${baseSlug}-${attempt}`;
+    }
 
-  const categoryId = generateId();
-  await db.insert(categories).values({ id: categoryId, organizationId: orgId, name, slug });
+    const categoryId = generateId();
+    await tx.insert(categories).values({ id: categoryId, organizationId: orgId, name, slug });
 
-  revalidatePath("/dashboard");
-  return { success: true, data: { categoryId } };
+    revalidatePath("/dashboard");
+    return { success: true, data: { categoryId } };
+  });
 }
 
 export async function deleteCategoryAction(orgId: string, categoryId: string): Promise<ActionResult> {
@@ -66,9 +66,9 @@ export async function deleteCategoryAction(orgId: string, categoryId: string): P
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_categories");
 
-  await db
-    .delete(categories)
-    .where(and(eq(categories.id, categoryId), eq(categories.organizationId, orgId)));
+  await withOrgContext(orgId, (tx) =>
+    tx.delete(categories).where(and(eq(categories.id, categoryId), eq(categories.organizationId, orgId)))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };

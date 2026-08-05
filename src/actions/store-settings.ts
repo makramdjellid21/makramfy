@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withOrgContext } from "@/db";
 import { storeSettings, memberships } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
@@ -19,11 +19,10 @@ async function getMembership(userId: string, orgId: string) {
 }
 
 export async function getStoreSettings(orgId: string) {
-  const [settings] = await db
-    .select()
-    .from(storeSettings)
-    .where(eq(storeSettings.organizationId, orgId));
-  return settings ?? null;
+  return withOrgContext(orgId, async (tx) => {
+    const [settings] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId));
+    return settings ?? null;
+  });
 }
 
 export async function updateStoreSettingsAction(
@@ -54,11 +53,6 @@ export async function updateStoreSettingsAction(
   const telegramChatId = (formData.get("telegramChatId") as string)?.trim();
   const facebookPixelId = (formData.get("facebookPixelId") as string)?.trim();
 
-  const [existing] = await db
-    .select()
-    .from(storeSettings)
-    .where(eq(storeSettings.organizationId, orgId));
-
   const values = {
     description: description || null,
     bannerUrl: bannerUrl || null,
@@ -81,11 +75,15 @@ export async function updateStoreSettingsAction(
     updatedAt: new Date(),
   };
 
-  if (existing) {
-    await db.update(storeSettings).set(values).where(eq(storeSettings.organizationId, orgId));
-  } else {
-    await db.insert(storeSettings).values({ id: generateId(), organizationId: orgId, ...values });
-  }
+  await withOrgContext(orgId, async (tx) => {
+    const [existing] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId));
+
+    if (existing) {
+      await tx.update(storeSettings).set(values).where(eq(storeSettings.organizationId, orgId));
+    } else {
+      await tx.insert(storeSettings).values({ id: generateId(), organizationId: orgId, ...values });
+    }
+  });
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -121,24 +119,23 @@ export async function toggleStorePublishedAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_store_settings");
 
-  const [existing] = await db
-    .select()
-    .from(storeSettings)
-    .where(eq(storeSettings.organizationId, orgId));
+  await withOrgContext(orgId, async (tx) => {
+    const [existing] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId));
 
-  if (existing) {
-    await db
-      .update(storeSettings)
-      .set({ isPublished, updatedAt: new Date() })
-      .where(eq(storeSettings.organizationId, orgId));
-  } else {
-    await db.insert(storeSettings).values({
-      id: generateId(),
-      organizationId: orgId,
-      isPublished,
-      updatedAt: new Date(),
-    });
-  }
+    if (existing) {
+      await tx
+        .update(storeSettings)
+        .set({ isPublished, updatedAt: new Date() })
+        .where(eq(storeSettings.organizationId, orgId));
+    } else {
+      await tx.insert(storeSettings).values({
+        id: generateId(),
+        organizationId: orgId,
+        isPublished,
+        updatedAt: new Date(),
+      });
+    }
+  });
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };

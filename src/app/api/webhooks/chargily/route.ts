@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { db, withPlatformBypass } from "@/db";
 import { orders, subscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyChargilySignature } from "@/lib/chargily";
@@ -36,10 +36,14 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.paid") {
       if (metadata.type === "order" && metadata.orderId) {
-        await db
-          .update(orders)
-          .set({ paymentStatus: "paid", chargilyCheckoutId: checkout.id, updatedAt: new Date() })
-          .where(eq(orders.id, metadata.orderId));
+        // orders محمي بـ RLS، ولا نملك organizationId هنا (Chargily ما يرجعه
+        // لطلبات COD) — bypass مبرر: الطلب موقّع ومتحقق منه أعلاه بالتوقيع.
+        await withPlatformBypass((tx) =>
+          tx
+            .update(orders)
+            .set({ paymentStatus: "paid", chargilyCheckoutId: checkout.id, updatedAt: new Date() })
+            .where(eq(orders.id, metadata.orderId))
+        );
       }
 
       if (metadata.type === "subscription" && metadata.organizationId && metadata.plan) {
@@ -68,10 +72,12 @@ export async function POST(request: Request) {
 
     if (event.type === "checkout.failed" || event.type === "checkout.expired") {
       if (metadata.type === "order" && metadata.orderId) {
-        await db
-          .update(orders)
-          .set({ paymentStatus: "failed", updatedAt: new Date() })
-          .where(eq(orders.id, metadata.orderId));
+        await withPlatformBypass((tx) =>
+          tx
+            .update(orders)
+            .set({ paymentStatus: "failed", updatedAt: new Date() })
+            .where(eq(orders.id, metadata.orderId))
+        );
       }
     }
   } catch (err) {

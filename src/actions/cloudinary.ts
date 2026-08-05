@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withOrgContext } from "@/db";
 import { usageRecords, storeSettings } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
@@ -27,10 +27,9 @@ export async function getCloudinarySignatureAction(
   // إن كان عند هذا المتجر بيانات Cloudinary مخصصة (مضبوطة من لوحة الأدمن)، نستخدمها
   let overrideCredentials: { cloudName: string; apiKey: string; apiSecret: string } | undefined;
   if (orgId) {
-    const [settings] = await db
-      .select()
-      .from(storeSettings)
-      .where(eq(storeSettings.organizationId, orgId));
+    const [settings] = await withOrgContext(orgId, (tx) =>
+      tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId))
+    );
 
     if (settings?.cloudinaryCloudName && settings.cloudinaryApiKey && settings.cloudinaryApiSecret) {
       overrideCredentials = {

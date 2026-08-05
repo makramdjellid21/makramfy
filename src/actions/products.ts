@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withOrgContext } from "@/db";
 import { products, productVariants, memberships, subscriptions, usageRecords } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
@@ -22,12 +22,13 @@ async function getMembership(userId: string, orgId: string) {
 
 // ─── Get Products (with category + variants) ──────────────────────────────────
 export async function getProducts(orgId: string) {
-  const list = await db.query.products.findMany({
-    where: eq(products.organizationId, orgId),
-    with: { category: true, variants: true },
-    orderBy: desc(products.createdAt),
-  });
-  return list;
+  return withOrgContext(orgId, (tx) =>
+    tx.query.products.findMany({
+      where: eq(products.organizationId, orgId),
+      with: { category: true, variants: true },
+      orderBy: desc(products.createdAt),
+    })
+  );
 }
 
 // ─── Create Product ─────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ export async function createProductAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
+  // subscriptions/usage_records خارج نطاق RLS حاليًا (راجع rls-policies.sql)
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.organizationId, orgId));
   const [usage] = await db.select().from(usageRecords).where(eq(usageRecords.organizationId, orgId));
   const plan = (sub?.plan ?? "free") as Plan;
@@ -70,43 +72,48 @@ export async function createProductAction(
     return { success: false, error: "السعر يجب أن يكون أكبر من صفر" };
   }
 
-  const baseSlug = generateSlug(name);
-  let slug = baseSlug;
-  let attempt = 0;
-  while (true) {
-    const [existing] = await db
-      .select()
-      .from(products)
-      .where(and(eq(products.organizationId, orgId), eq(products.slug, slug)));
-    if (!existing) break;
-    attempt++;
-    slug = `${baseSlug}-${attempt}`;
-  }
+  const productId = await withOrgContext(orgId, async (tx) => {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let attempt = 0;
+    while (true) {
+      const [existing] = await tx
+        .select()
+        .from(products)
+        .where(and(eq(products.organizationId, orgId), eq(products.slug, slug)));
+      if (!existing) break;
+      attempt++;
+      slug = `${baseSlug}-${attempt}`;
+    }
 
-  const productId = generateId();
+    const id = generateId();
 
-  await db.insert(products).values({
-    id: productId,
-    organizationId: orgId,
-    categoryId,
-    name,
-    slug,
-    description: description || null,
-    imageUrl: imageUrl || null,
-    images,
-    basePriceCents: Math.round(priceDzd * 100),
-    isActive: true,
-    updatedAt: new Date(),
+    await tx.insert(products).values({
+      id,
+      organizationId: orgId,
+      categoryId,
+      name,
+      slug,
+      description: description || null,
+      imageUrl: imageUrl || null,
+      images,
+      basePriceCents: Math.round(priceDzd * 100),
+      isActive: true,
+      updatedAt: new Date(),
+    });
+
+    // متغير افتراضي واحد يحمل المخزون (يمكن إضافة متغيرات أخرى لاحقًا)
+    await tx.insert(productVariants).values({
+      id: generateId(),
+      productId: id,
+      name: "افتراضي",
+      stockQuantity,
+    });
+
+    return id;
   });
 
-  // متغير افتراضي واحد يحمل المخزون (يمكن إضافة متغيرات أخرى لاحقًا)
-  await db.insert(productVariants).values({
-    id: generateId(),
-    productId,
-    name: "افتراضي",
-    stockQuantity,
-  });
-
+  // usage_records خارج نطاق RLS حاليًا
   await db
     .update(usageRecords)
     .set({ productCount: sql`product_count + 1` })
@@ -147,18 +154,20 @@ export async function updateProductAction(
     return { success: false, error: "السعر يجب أن يكون أكبر من صفر" };
   }
 
-  await db
-    .update(products)
-    .set({
-      name,
-      description: description || null,
-      imageUrl: imageUrl || null,
-      images,
-      categoryId,
-      basePriceCents: Math.round(priceDzd * 100),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
+  await withOrgContext(orgId, (tx) =>
+    tx
+      .update(products)
+      .set({
+        name,
+        description: description || null,
+        imageUrl: imageUrl || null,
+        images,
+        categoryId,
+        basePriceCents: Math.round(priceDzd * 100),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(products.id, productId), eq(products.organizationId, orgId)))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -175,10 +184,12 @@ export async function toggleProductActiveAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
-  await db
-    .update(products)
-    .set({ isActive, updatedAt: new Date() })
-    .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
+  await withOrgContext(orgId, (tx) =>
+    tx
+      .update(products)
+      .set({ isActive, updatedAt: new Date() })
+      .where(and(eq(products.id, productId), eq(products.organizationId, orgId)))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -195,10 +206,12 @@ export async function toggleProductFeaturedAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
-  await db
-    .update(products)
-    .set({ isFeatured, updatedAt: new Date() })
-    .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
+  await withOrgContext(orgId, (tx) =>
+    tx
+      .update(products)
+      .set({ isFeatured, updatedAt: new Date() })
+      .where(and(eq(products.id, productId), eq(products.organizationId, orgId)))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -215,10 +228,12 @@ export async function updateStockAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
-  await db
-    .update(productVariants)
-    .set({ stockQuantity: Math.max(0, stockQuantity) })
-    .where(eq(productVariants.productId, productId));
+  await withOrgContext(orgId, (tx) =>
+    tx
+      .update(productVariants)
+      .set({ stockQuantity: Math.max(0, stockQuantity) })
+      .where(eq(productVariants.productId, productId))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -235,28 +250,34 @@ export async function addProductVariantAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
-  const [product] = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
-  if (!product) return { success: false, error: "المنتج غير موجود" };
-
   if (!data.name.trim()) {
     return { success: false, error: "اسم المتغيّر مطلوب (مثال: أحمر - L)" };
   }
 
-  const variantId = generateId();
-  await db.insert(productVariants).values({
-    id: variantId,
-    productId,
-    name: data.name.trim(),
-    priceCents: data.priceCents,
-    stockQuantity: Math.max(0, data.stockQuantity),
-    imageUrl: data.imageUrl || null,
+  const result = await withOrgContext(orgId, async (tx) => {
+    const [product] = await tx
+      .select()
+      .from(products)
+      .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
+    if (!product) return null;
+
+    const variantId = generateId();
+    await tx.insert(productVariants).values({
+      id: variantId,
+      productId,
+      name: data.name.trim(),
+      priceCents: data.priceCents,
+      stockQuantity: Math.max(0, data.stockQuantity),
+      imageUrl: data.imageUrl || null,
+    });
+
+    return variantId;
   });
 
+  if (!result) return { success: false, error: "المنتج غير موجود" };
+
   revalidatePath("/dashboard");
-  return { success: true, data: { variantId } };
+  return { success: true, data: { variantId: result } };
 }
 
 export async function updateProductVariantAction(
@@ -273,15 +294,17 @@ export async function updateProductVariantAction(
     return { success: false, error: "اسم المتغيّر مطلوب" };
   }
 
-  await db
-    .update(productVariants)
-    .set({
-      name: data.name.trim(),
-      priceCents: data.priceCents,
-      stockQuantity: Math.max(0, data.stockQuantity),
-      imageUrl: data.imageUrl || null,
-    })
-    .where(eq(productVariants.id, variantId));
+  await withOrgContext(orgId, (tx) =>
+    tx
+      .update(productVariants)
+      .set({
+        name: data.name.trim(),
+        priceCents: data.priceCents,
+        stockQuantity: Math.max(0, data.stockQuantity),
+        imageUrl: data.imageUrl || null,
+      })
+      .where(eq(productVariants.id, variantId))
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -297,16 +320,18 @@ export async function deleteProductVariantAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "manage_products");
 
-  const remaining = await db
-    .select()
-    .from(productVariants)
-    .where(eq(productVariants.productId, productId));
+  const result = await withOrgContext(orgId, async (tx) => {
+    const remaining = await tx.select().from(productVariants).where(eq(productVariants.productId, productId));
 
-  if (remaining.length <= 1) {
-    return { success: false, error: "لا يمكن حذف آخر متغيّر — يجب أن يبقى للمنتج متغيّر واحد على الأقل" };
-  }
+    if (remaining.length <= 1) {
+      return { success: false, error: "لا يمكن حذف آخر متغيّر — يجب أن يبقى للمنتج متغيّر واحد على الأقل" } as const;
+    }
 
-  await db.delete(productVariants).where(eq(productVariants.id, variantId));
+    await tx.delete(productVariants).where(eq(productVariants.id, variantId));
+    return { success: true } as const;
+  });
+
+  if (!result.success) return { success: false, error: result.error };
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
@@ -322,10 +347,11 @@ export async function deleteProductAction(
   if (!membership) return { success: false, error: "غير مصرح" };
   requirePermission(membership.role as Role, "delete_product");
 
-  await db
-    .delete(products)
-    .where(and(eq(products.id, productId), eq(products.organizationId, orgId)));
+  await withOrgContext(orgId, (tx) =>
+    tx.delete(products).where(and(eq(products.id, productId), eq(products.organizationId, orgId)))
+  );
 
+  // usage_records خارج نطاق RLS حاليًا
   await db
     .update(usageRecords)
     .set({ productCount: sql`GREATEST(product_count - 1, 0)` })

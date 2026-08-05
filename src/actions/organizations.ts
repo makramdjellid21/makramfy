@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withOrgContext } from "@/db";
 import {
   organizations,
   memberships,
@@ -124,12 +124,14 @@ export async function createOrganizationAction(
     productCount: 0,
   });
 
-  await db.insert(storeSettings).values({
-    id: generateId(),
-    organizationId: orgId,
-    isPublished: false,
-    updatedAt: new Date(),
-  });
+  await withOrgContext(orgId, (tx) =>
+    tx.insert(storeSettings).values({
+      id: generateId(),
+      organizationId: orgId,
+      isPublished: false,
+      updatedAt: new Date(),
+    })
+  );
 
   revalidatePath("/dashboard");
   return { success: true, data: { orgId, slug } };
@@ -454,19 +456,13 @@ export async function getDashboardData(orgSlug: string) {
     .from(usageRecords)
     .where(eq(usageRecords.organizationId, org.id));
 
-  const recentProducts = await db
-    .select()
-    .from(products)
-    .where(eq(products.organizationId, org.id))
-    .orderBy(desc(products.createdAt))
-    .limit(6);
+  const recentProducts = await withOrgContext(org.id, (tx) =>
+    tx.select().from(products).where(eq(products.organizationId, org.id)).orderBy(desc(products.createdAt)).limit(6)
+  );
 
-  const recentOrders = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.organizationId, org.id))
-    .orderBy(desc(orders.createdAt))
-    .limit(5);
+  const recentOrders = await withOrgContext(org.id, (tx) =>
+    tx.select().from(orders).where(eq(orders.organizationId, org.id)).orderBy(desc(orders.createdAt)).limit(5)
+  );
 
   const memberList = await db
     .select({

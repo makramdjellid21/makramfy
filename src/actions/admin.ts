@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { db, withPlatformBypass } from "@/db";
 import { organizations, subscriptions, users, products, orders, storeSettings, blockedPhones } from "@/db/schema";
 import { eq, and, count, countDistinct, desc, isNull, sql } from "drizzle-orm";
 import { getPlatformAdmin } from "@/lib/admin-auth";
@@ -16,8 +16,13 @@ export async function getPlatformStats() {
 
   const [storeCount] = await db.select({ value: count() }).from(organizations);
   const [userCount] = await db.select({ value: count() }).from(users);
-  const [orderCount] = await db.select({ value: count() }).from(orders);
-  const [productCount] = await db.select({ value: count() }).from(products);
+
+  // orders/products محميان بـ RLS — لوحة الأدمن تحتاج شرعًا رؤية كل المتاجر
+  const { orderCount, productCount } = await withPlatformBypass(async (tx) => {
+    const [oc] = await tx.select({ value: count() }).from(orders);
+    const [pc] = await tx.select({ value: count() }).from(products);
+    return { orderCount: oc?.value ?? 0, productCount: pc?.value ?? 0 };
+  });
 
   const planBreakdown = await db
     .select({ plan: subscriptions.plan, value: count() })
@@ -31,8 +36,8 @@ export async function getPlatformStats() {
   return {
     storeCount: storeCount?.value ?? 0,
     userCount: userCount?.value ?? 0,
-    orderCount: orderCount?.value ?? 0,
-    productCount: productCount?.value ?? 0,
+    orderCount,
+    productCount,
     planBreakdown,
     monthlyRevenueCents,
   };
@@ -43,10 +48,13 @@ export async function getAllStores() {
   const admin = await getPlatformAdmin();
   if (!admin) return null;
 
-  return db.query.organizations.findMany({
-    with: { subscription: true, storeSettings: true },
-    orderBy: desc(organizations.createdAt),
-  });
+  // storeSettings محمي بـ RLS، والاستعلام هنا يشمل متاجر كل المنصة
+  return withPlatformBypass((tx) =>
+    tx.query.organizations.findMany({
+      with: { subscription: true, storeSettings: true },
+      orderBy: desc(organizations.createdAt),
+    })
+  );
 }
 
 // ─── قائمة كل المستخدمين بالمنصة ──────────────────────────────────────────────
@@ -72,10 +80,10 @@ export async function adminDeleteStoreAction(
   let cloudinarySkippedReason: string | undefined;
 
   if (purgeCloudinary) {
-    const [settings] = await db
-      .select()
-      .from(storeSettings)
-      .where(eq(storeSettings.organizationId, orgId));
+    const settings = await withPlatformBypass(async (tx) => {
+      const [s] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId));
+      return s;
+    });
 
     if (settings?.cloudinaryCloudName && settings.cloudinaryApiKey && settings.cloudinaryApiSecret) {
       // حساب Cloudinary معزول خاص بهذا المتجر — آمن حذف كل شيء فيه
@@ -94,7 +102,8 @@ export async function adminDeleteStoreAction(
   }
 
   // حذف المتجر من قاعدة البيانات يحذف تلقائيًا: المنتجات، الطلبات، الأعضاء،
-  // الدعوات، الاشتراك، الإعدادات، الإشعارات... (كلها onDelete: cascade)
+  // الدعوات، الاشتراك، الإعدادات، الإشعارات... (كلها onDelete: cascade، ولا
+  // يتأثر بـ RLS لأن cascade عبر foreign keys لا تمر بسياسات RLS العادية)
   await db.delete(organizations).where(eq(organizations.id, orgId));
 
   revalidatePath("/admin/stores");
@@ -136,15 +145,17 @@ export async function adminSetStoreCloudinaryAction(
     return { success: false, error: "إمّا عبّي الحقول الثلاثة كلها، أو خليها فارغة كلها" };
   }
 
-  await db
-    .update(storeSettings)
-    .set({
-      cloudinaryCloudName: allEmpty ? null : cloudName,
-      cloudinaryApiKey: allEmpty ? null : apiKey,
-      cloudinaryApiSecret: allEmpty ? null : apiSecret,
-      updatedAt: new Date(),
-    })
-    .where(eq(storeSettings.organizationId, orgId));
+  await withPlatformBypass((tx) =>
+    tx
+      .update(storeSettings)
+      .set({
+        cloudinaryCloudName: allEmpty ? null : cloudName,
+        cloudinaryApiKey: allEmpty ? null : apiKey,
+        cloudinaryApiSecret: allEmpty ? null : apiSecret,
+        updatedAt: new Date(),
+      })
+      .where(eq(storeSettings.organizationId, orgId))
+  );
 
   revalidatePath("/admin/stores");
   return { success: true, data: undefined };
@@ -157,11 +168,13 @@ export async function getPlatformBlockedPhonesAction(): Promise<
   const admin = await getPlatformAdmin();
   if (!admin) return { success: false, error: "غير مصرح" };
 
-  const rows = await db
-    .select()
-    .from(blockedPhones)
-    .where(isNull(blockedPhones.organizationId))
-    .orderBy(desc(blockedPhones.createdAt));
+  const rows = await withPlatformBypass((tx) =>
+    tx
+      .select()
+      .from(blockedPhones)
+      .where(isNull(blockedPhones.organizationId))
+      .orderBy(desc(blockedPhones.createdAt))
+  );
 
   return { success: true, data: rows };
 }
@@ -173,13 +186,15 @@ export async function getMultiReportedPhonesAction(): Promise<
   const admin = await getPlatformAdmin();
   if (!admin) return { success: false, error: "غير مصرح" };
 
-  const rows = await db
-    .select({ phone: blockedPhones.phone, storeCount: countDistinct(blockedPhones.organizationId) })
-    .from(blockedPhones)
-    .where(sql`${blockedPhones.organizationId} is not null`)
-    .groupBy(blockedPhones.phone)
-    .having(sql`count(distinct ${blockedPhones.organizationId}) >= 2`)
-    .orderBy(desc(countDistinct(blockedPhones.organizationId)));
+  const rows = await withPlatformBypass((tx) =>
+    tx
+      .select({ phone: blockedPhones.phone, storeCount: countDistinct(blockedPhones.organizationId) })
+      .from(blockedPhones)
+      .where(sql`${blockedPhones.organizationId} is not null`)
+      .groupBy(blockedPhones.phone)
+      .having(sql`count(distinct ${blockedPhones.organizationId}) >= 2`)
+      .orderBy(desc(countDistinct(blockedPhones.organizationId)))
+  );
 
   return { success: true, data: rows };
 }
@@ -191,17 +206,19 @@ export async function adminBlockPhonePlatformWideAction(phone: string, reason?: 
   const cleanPhone = phone.trim();
   if (!cleanPhone) return { success: false, error: "رقم الهاتف مطلوب" };
 
-  const [existing] = await db
-    .select()
-    .from(blockedPhones)
-    .where(and(isNull(blockedPhones.organizationId), eq(blockedPhones.phone, cleanPhone)));
-  if (existing) return { success: true, data: undefined };
+  await withPlatformBypass(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(blockedPhones)
+      .where(and(isNull(blockedPhones.organizationId), eq(blockedPhones.phone, cleanPhone)));
+    if (existing) return;
 
-  await db.insert(blockedPhones).values({
-    id: generateId(),
-    organizationId: null,
-    phone: cleanPhone,
-    reason: reason?.trim() || "حظر شامل من الأدمن",
+    await tx.insert(blockedPhones).values({
+      id: generateId(),
+      organizationId: null,
+      phone: cleanPhone,
+      reason: reason?.trim() || "حظر شامل من الأدمن",
+    });
   });
 
   revalidatePath("/admin");
@@ -212,7 +229,9 @@ export async function adminUnblockPhonePlatformWideAction(id: string): Promise<A
   const admin = await getPlatformAdmin();
   if (!admin) return { success: false, error: "غير مصرح" };
 
-  await db.delete(blockedPhones).where(and(eq(blockedPhones.id, id), isNull(blockedPhones.organizationId)));
+  await withPlatformBypass((tx) =>
+    tx.delete(blockedPhones).where(and(eq(blockedPhones.id, id), isNull(blockedPhones.organizationId)))
+  );
 
   revalidatePath("/admin");
   return { success: true, data: undefined };
