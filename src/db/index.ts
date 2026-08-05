@@ -47,7 +47,7 @@ export async function withOrgContext<T>(
 ): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.current_org_id', ${organizationId}, true)`);
-    return fn(tx as typeof db);
+    return fn(tx as unknown as typeof db);
   });
 }
 
@@ -56,6 +56,6 @@ export async function withOrgContext<T>(
 export async function withPlatformBypass<T>(fn: (tx: typeof db) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT set_config('app.bypass_rls', 'on', true)`);
-    return fn(tx as typeof db);
+    return fn(tx as unknown as typeof db);
   });
 }
