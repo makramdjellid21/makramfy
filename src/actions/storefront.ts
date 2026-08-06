@@ -73,6 +73,13 @@ export async function getOrdersByPhone(organizationId: string, phone: string) {
   const cleanPhone = phone.trim();
   if (!cleanPhone) return [];
 
+  // حماية من استنزاف الأرقام (Enumeration/Scraping) — نفس آلية حماية الدفع
+  const ip = await getClientIp();
+  const rateLimit = await checkCheckoutRateLimit(`track:${ip}`);
+  if (!rateLimit.allowed) return []; // رد صامت (مو رسالة خطأ) حتى لا نكشف وجود الحماية
+
+  await recordCheckoutAttempt(`track:${ip}`);
+
   return withOrgContext(organizationId, async (tx) => {
     const customer = await tx.query.customers.findFirst({
       where: and(eq(customers.organizationId, organizationId), eq(customers.phone, cleanPhone)),
