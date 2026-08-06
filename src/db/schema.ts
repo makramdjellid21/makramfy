@@ -259,6 +259,10 @@ export const storeSettings = pgTable("store_settings", {
   cloudinaryCloudName: text("cloudinary_cloud_name"),
   cloudinaryApiKey: text("cloudinary_api_key"),
   cloudinaryApiSecret: text("cloudinary_api_secret"),
+  // مفتاح Chargily السري الخاص بهذا المتجر — بدونه، الدفع الأونلاين معطّل
+  // لهذا المتجر تمامًا (لا يوجد أي fallback لمفتاح مشترك، لأن أموال العملاء
+  // يجب أن تصل مباشرة لحساب التاجر صاحب المتجر، وليس لحساب المنصة).
+  chargilySecretKey: text("chargily_secret_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

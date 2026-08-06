@@ -70,6 +70,7 @@ export function DashboardSidebar({
     { id: "general", label: "المعلومات العامة", icon: Info },
     { id: "appearance", label: "المظهر والتواصل", icon: Palette },
     { id: "promo", label: "الترويج والتواصل الاجتماعي", icon: Megaphone },
+    { id: "payment", label: "الدفع الإلكتروني", icon: CreditCard },
     { id: "legal", label: "الصفحات القانونية", icon: FileText },
     { id: "marketing", label: "التسويق والتكاملات", icon: TrendingUp },
   ];

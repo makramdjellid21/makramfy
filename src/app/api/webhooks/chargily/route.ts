@@ -1,5 +1,5 @@
 import { db, withPlatformBypass } from "@/db";
-import { orders, subscriptions } from "@/db/schema";
+import { orders, subscriptions, storeSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyChargilySignature } from "@/lib/chargily";
 
@@ -19,16 +19,35 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const signature = request.headers.get("signature");
 
-  if (!verifyChargilySignature(rawBody, signature)) {
-    return Response.json({ error: "Invalid signature" }, { status: 403 });
-  }
-
-  let event: ChargilyEvent;
+  // نحتاج نطّلع على metadata أولًا (بدون أي ثقة بمحتواها بعد) فقط لنعرف
+  // بأي مفتاح نتحقق من التوقيع — كل متجر عنده مفتاح Chargily مختلف.
+  let peekedEvent: ChargilyEvent;
   try {
-    event = JSON.parse(rawBody);
+    peekedEvent = JSON.parse(rawBody);
   } catch {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
+
+  const peekedMetadata = peekedEvent.data?.metadata ?? {};
+  let secretKeyOverride: string | undefined;
+
+  if (peekedMetadata.type === "order" && peekedMetadata.organizationId) {
+    const [settings] = await withPlatformBypass((tx) =>
+      tx.select().from(storeSettings).where(eq(storeSettings.organizationId, peekedMetadata.organizationId))
+    );
+    if (!settings?.chargilySecretKey) {
+      // لا مفتاح مخزّن لهذا المتجر = لا يمكن التحقق من التوقيع بأمان، نرفض
+      return Response.json({ error: "Unknown store" }, { status: 403 });
+    }
+    secretKeyOverride = settings.chargilySecretKey;
+  }
+  // النوع "subscription" (اشتراك التاجر بالمنصة) يتحقق بمفتاح المنصة الافتراضي
+
+  if (!verifyChargilySignature(rawBody, signature, secretKeyOverride)) {
+    return Response.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
+  const event = peekedEvent;
 
   try {
     const checkout = event.data;

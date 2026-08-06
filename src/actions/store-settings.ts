@@ -52,6 +52,7 @@ export async function updateStoreSettingsAction(
   const telegramBotToken = (formData.get("telegramBotToken") as string)?.trim();
   const telegramChatId = (formData.get("telegramChatId") as string)?.trim();
   const facebookPixelId = (formData.get("facebookPixelId") as string)?.trim();
+  const chargilySecretKey = (formData.get("chargilySecretKey") as string)?.trim();
 
   const values = {
     description: description || null,
@@ -72,6 +73,7 @@ export async function updateStoreSettingsAction(
     telegramBotToken: telegramBotToken || null,
     telegramChatId: telegramChatId || null,
     facebookPixelId: facebookPixelId || null,
+    chargilySecretKey: chargilySecretKey || null,
     updatedAt: new Date(),
   };
 

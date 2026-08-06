@@ -33,13 +33,14 @@ export interface ChargilyCheckout {
 }
 
 export async function createChargilyCheckout(
-  params: CreateCheckoutParams
+  params: CreateCheckoutParams,
+  secretKeyOverride?: string
 ): Promise<{ success: true; checkout: ChargilyCheckout } | { success: false; error: string }> {
   try {
     const res = await fetch(`${BASE_URL}/checkouts`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${getSecretKey()}`,
+        Authorization: `Bearer ${secretKeyOverride ?? getSecretKey()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -68,9 +69,16 @@ export async function createChargilyCheckout(
 }
 
 // ─── التحقق من توقيع الـ Webhook (HMAC-SHA256 hex بالمفتاح السري) ─────────────
-export function verifyChargilySignature(rawBody: string, signatureHeader: string | null): boolean {
+export function verifyChargilySignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secretKeyOverride?: string
+): boolean {
   if (!signatureHeader) return false;
-  const computed = crypto.createHmac("sha256", getSecretKey()).update(rawBody, "utf8").digest("hex");
+  const computed = crypto
+    .createHmac("sha256", secretKeyOverride ?? getSecretKey())
+    .update(rawBody, "utf8")
+    .digest("hex");
   try {
     return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(signatureHeader));
   } catch {

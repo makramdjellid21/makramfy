@@ -338,13 +338,21 @@ export async function createOrderPaymentCheckoutAction(
     return { success: false, error: "الدفع الإلكتروني متاح فقط للمتاجر على الخطة الاحترافية أو أعمال" };
   }
 
-  const result = await createChargilyCheckout({
-    amount: Math.round(amountCents / 100),
-    successUrl: `https://${subdomain}.${ROOT_DOMAIN}/order-success?order=${orderId}`,
-    failureUrl: `https://${subdomain}.${ROOT_DOMAIN}/checkout?failed=1`,
-    description: `طلب #${orderId.slice(0, 8)}`,
-    metadata: { type: "order", orderId, organizationId },
-  });
+  const [settings] = await db.select().from(storeSettings).where(eq(storeSettings.organizationId, organizationId));
+  if (!settings?.chargilySecretKey) {
+    return { success: false, error: "المتجر لم يفعّل الدفع الإلكتروني بعد. يرجى التواصل معه أو اختيار الدفع عند الاستلام." };
+  }
+
+  const result = await createChargilyCheckout(
+    {
+      amount: Math.round(amountCents / 100),
+      successUrl: `https://${subdomain}.${ROOT_DOMAIN}/order-success?order=${orderId}`,
+      failureUrl: `https://${subdomain}.${ROOT_DOMAIN}/checkout?failed=1`,
+      description: `طلب #${orderId.slice(0, 8)}`,
+      metadata: { type: "order", orderId, organizationId },
+    },
+    settings.chargilySecretKey
+  );
 
   if (!result.success) return { success: false, error: result.error };
 

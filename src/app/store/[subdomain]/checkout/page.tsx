@@ -16,7 +16,7 @@ export default async function CheckoutPage({ params }: PageProps) {
       subdomain={subdomain}
       organizationId={store.org.id}
       themeColor={store.settings.themeColor}
-      allowOnlinePayment={store.plan !== "free"}
+      allowOnlinePayment={store.plan !== "free" && Boolean(store.settings.chargilySecretKey)}
     />
   );
 }

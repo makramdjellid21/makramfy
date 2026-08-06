@@ -14,7 +14,7 @@ import {
 } from "@/actions/store-settings";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText } from "lucide-react";
+import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText, CreditCard, CheckCircle2 } from "lucide-react";
 
 interface Org {
   id: string;
@@ -78,6 +78,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [telegramBotToken, setTelegramBotToken] = useState(settings?.telegramBotToken ?? "");
   const [telegramChatId, setTelegramChatId] = useState(settings?.telegramChatId ?? "");
   const [facebookPixelId, setFacebookPixelId] = useState(settings?.facebookPixelId ?? "");
+  const [chargilySecretKey, setChargilySecretKey] = useState(settings?.chargilySecretKey ?? "");
   const [isPublished, setIsPublished] = useState(settings?.isPublished ?? false);
 
   const [savingGeneral, setSavingGeneral] = useState(false);
@@ -88,7 +89,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const searchParams = useSearchParams();
-  const validTabIds = ["general", "appearance", "promo", "legal", "marketing"];
+  const validTabIds = ["general", "appearance", "promo", "legal", "marketing", "payment"];
   const tabFromUrl = searchParams.get("tab");
   const activeTab = tabFromUrl && validTabIds.includes(tabFromUrl) ? tabFromUrl : "general";
 
@@ -113,6 +114,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
     formData.set("telegramBotToken", telegramBotToken.trim());
     formData.set("telegramChatId", telegramChatId.trim());
     formData.set("facebookPixelId", facebookPixelId.trim());
+    formData.set("chargilySecretKey", chargilySecretKey.trim());
     return formData;
   }
 
@@ -472,6 +474,53 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
         {canEdit && (
           <Button onClick={() => handleSaveSection("marketing", "تم حفظ إعدادات التسويق")} loading={savingSection === "marketing"}>
             حفظ إعدادات التسويق
+          </Button>
+        )}
+      </div>
+      )}
+
+      {/* الدفع الإلكتروني */}
+      {activeTab === "payment" && (
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <CreditCard size={18} className="text-emerald-600" />
+          <h2 className="text-lg font-semibold text-slate-900">الدفع الإلكتروني (Chargily Pay)</h2>
+        </div>
+
+        {chargilySecretKey ? (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium rounded-xl px-3 py-2.5">
+            <CheckCircle2 size={14} />
+            الدفع الأونلاين (EDAHABIA / CIB) مفعّل — أموال عملائك تصل مباشرة لحسابك أنت على Chargily
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-xl px-3 py-2.5 leading-relaxed">
+            بدون هذا المفتاح، عملاؤك يقدرون يدفعوا فقط عند الاستلام. لتفعيل الدفع الأونلاين، أضف مفتاحك السري الخاص.
+          </div>
+        )}
+
+        <p className="text-xs text-slate-500 leading-relaxed">
+          أنشئ حساب مجاني على{" "}
+          <a href="https://pay.chargily.com" target="_blank" rel="noreferrer" className="underline font-medium">
+            Chargily Pay
+          </a>{" "}
+          (إن لم يكن لديك)، ثم من لوحته اذهب لـ <span className="font-medium">API Keys</span> وانسخ
+          <span className="font-medium"> Secret Key</span> — هذا المفتاح خاص بحسابك أنت، وأموال عملائك تصل
+          مباشرة له، وليس لأي طرف آخر.
+        </p>
+
+        <Input
+          label="Chargily Secret Key"
+          placeholder="test_sk_... أو live_sk_..."
+          type="password"
+          value={chargilySecretKey}
+          onChange={(e) => setChargilySecretKey(e.target.value)}
+          disabled={!canEdit}
+          dir="ltr"
+        />
+
+        {canEdit && (
+          <Button onClick={() => handleSaveSection("payment", "تم حفظ إعدادات الدفع")} loading={savingSection === "payment"}>
+            حفظ
           </Button>
         )}
       </div>
