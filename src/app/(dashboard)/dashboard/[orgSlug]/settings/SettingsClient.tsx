@@ -42,6 +42,7 @@ interface Settings {
   telegramBotToken: string | null;
   telegramChatId: string | null;
   facebookPixelId: string | null;
+  chargilySecretKey: string | null;
 }
 
 interface SettingsClientProps {
