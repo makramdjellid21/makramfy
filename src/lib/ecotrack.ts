@@ -72,7 +72,11 @@ export async function createEcotrackOrder(
     });
 
     const text = await res.text();
-    let data: { results?: Record<string, unknown> };
+    let data: {
+      results?: Record<string, unknown>;
+      message?: string;
+      errors?: Record<string, string[]>;
+    };
     try {
       data = JSON.parse(text);
     } catch {
@@ -80,7 +84,17 @@ export async function createEcotrackOrder(
       return { success: false, error: "استجابة غير متوقعة من شركة التوصيل" };
     }
 
-    // الرد يُغلَّف دائمًا داخل results.{reference} — سواء نجاح أو خطأ تحقق
+    // بعض أخطاء التحقق (مثل اسم بلدية غير صحيح) ترجع مباشرة بالمستوى الأعلى
+    // {message, errors} بدون تغليف داخل results
+    if (!data.results && (data.message || data.errors)) {
+      const fieldMessages = data.errors ? Object.values(data.errors).flat() : [];
+      const errorMessage =
+        data.message ?? (fieldMessages.length > 0 ? fieldMessages.join(" — ") : "فشل إنشاء الشحنة");
+      console.error("EcoTrack top-level error:", data);
+      return { success: false, error: errorMessage };
+    }
+
+    // الرد عادة يُغلَّف داخل results.{reference} — سواء نجاح أو خطأ تحقق
     const entry = data.results?.[order.reference] as unknown;
 
     if (!entry || typeof entry !== "object") {
