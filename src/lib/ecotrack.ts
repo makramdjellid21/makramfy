@@ -81,18 +81,16 @@ export async function createEcotrackOrder(
     }
 
     // الرد يُغلَّف دائمًا داخل results.{reference} — سواء نجاح أو خطأ تحقق
-    const entry = data.results?.[order.reference] as
-      | { success: true; tracking: string }
-      | Record<string, string[]>
-      | undefined;
+    const entry = data.results?.[order.reference] as unknown;
 
-    if (!entry) {
+    if (!entry || typeof entry !== "object") {
       console.error("EcoTrack: رد غير متوقع (بدون results لهذا الـ reference):", data);
       return { success: false, error: "تعذّر فهم رد شركة التوصيل" };
     }
 
-    if ("success" in entry && entry.success && entry.tracking) {
-      return { success: true, trackingNumber: entry.tracking };
+    const successEntry = entry as { success?: unknown; tracking?: unknown };
+    if (successEntry.success === true && typeof successEntry.tracking === "string") {
+      return { success: true, trackingNumber: successEntry.tracking };
     }
 
     // خطأ تحقق: كائن {field: [رسائل]} — نجمعها برسالة واحدة مفهومة
