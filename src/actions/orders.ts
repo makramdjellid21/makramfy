@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
 import type { ActionResult } from "./auth";
 import { generateId } from "@/lib/utils";
-import { createEcotrackOrder } from "@/lib/ecotrack";
+import { createEcotrackOrder, getEcotrackCommunes, matchEcotrackCommune } from "@/lib/ecotrack";
 import { revalidatePath } from "next/cache";
 
 async function getMembership(userId: string, orgId: string) {
@@ -176,20 +176,53 @@ export async function shipOrderToEcotrackAction(
       .join(", ")
       .slice(0, 250);
 
-    const result = await createEcotrackOrder(
-      { baseUrl: settings.ecotrackBaseUrl, apiToken: settings.ecotrackApiToken },
-      {
+    const credentials = { baseUrl: settings.ecotrackBaseUrl, apiToken: settings.ecotrackApiToken };
+
+    // نطابق اسم البلدية مع القائمة الحقيقية المفعّلة على حساب Anderson بدل
+    // إرسال الاسم كما هو (قد يختلف بالإملاء/الأكسنت عن قائمتهم فيرفض الطلب)
+    const communesResult = await getEcotrackCommunes(credentials, order.wilayaCode);
+    const activeCommunes = communesResult.success ? communesResult.communes : [];
+    const matchedCommune = activeCommunes.length > 0 ? matchEcotrackCommune(order.commune ?? "", activeCommunes) : null;
+
+    if (activeCommunes.length > 0 && !matchedCommune) {
+      return {
+        success: false,
+        error: `بلدية "${order.commune}" غير مفعّلة على حساب Anderson لهذه الولاية. تحقق من الاسم أو اختر بلدية مجاورة.`,
+      };
+    }
+
+    // لو عندنا بيانات دقيقة عن دعم "استلام من مكتب" لهذه البلدية، نحترمها من
+    // البداية بدل الاعتماد فقط على إعادة المحاولة بعد الخطأ
+    let stopDesk = order.deliveryType === "desk" && (matchedCommune?.hasStopDesk ?? true);
+
+    let result = await createEcotrackOrder(credentials, {
+      reference: order.id.slice(0, 20),
+      nomClient: order.customer.name,
+      telephone: order.customer.phone,
+      adresse: order.shippingAddress ?? "",
+      communeName: matchedCommune?.name ?? order.commune ?? "",
+      wilayaCode: order.wilayaCode,
+      montant: order.totalCents / 100,
+      produit: productSummary || "منتجات متنوعة",
+      stopDesk,
+    });
+
+    // شبكة أمان إضافية: لو رجع خطأ "stop desk" رغم كل هذا، نعيد المحاولة
+    // تلقائيًا كتوصيل منزلي بدل ما نفشل الطلب بالكامل
+    if (!result.success && stopDesk && /stop.?desk/i.test(result.error)) {
+      stopDesk = false;
+      result = await createEcotrackOrder(credentials, {
         reference: order.id.slice(0, 20),
         nomClient: order.customer.name,
         telephone: order.customer.phone,
         adresse: order.shippingAddress ?? "",
-        communeName: order.commune ?? "",
+        communeName: matchedCommune?.name ?? order.commune ?? "",
         wilayaCode: order.wilayaCode,
         montant: order.totalCents / 100,
         produit: productSummary || "منتجات متنوعة",
-        stopDesk: order.deliveryType === "desk",
-      }
-    );
+        stopDesk: false,
+      });
+    }
 
     if (!result.success) return { success: false, error: result.error };
 

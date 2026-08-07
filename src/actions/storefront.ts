@@ -15,7 +15,8 @@ import {
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils";
 import { createChargilyCheckout } from "@/lib/chargily";
-import { getDeliveryPrice, getWilaya } from "@/lib/wilayas";
+import { getDeliveryPrice, getWilaya, WILAYAS } from "@/lib/wilayas";
+import { getEcotrackWilayas, getEcotrackCommunes } from "@/lib/ecotrack";
 import { sendTelegramMessage, formatOrderNotification } from "@/lib/telegram";
 import { createNotification } from "./notifications";
 import type { ActionResult } from "./auth";
@@ -102,6 +103,108 @@ export async function getOrderById(organizationId: string, orderId: string) {
       with: { items: true },
     })
   );
+}
+
+// ─── ولايات/بلديات التوصيل الفعلية للـ checkout ──────────────────────────────
+// إذا كان المتجر مربوطًا بحساب EcoTrack (Anderson)، نجيب القائمة الحقيقية
+// المفعّلة لحسابه (بعض الولايات/البلديات ما توصلها الشركة، وبعض البلديات
+// ما فيها "استلام من مكتب")، بدل الاعتماد الكامل على القائمة الثابتة لكل
+// الجزائر — وهذا يمنع أخطاء "Commune mal écrite" و"Stop desk non disponible"
+// من الأساس بدل ما تنكشف بعد إرسال الطلب لشركة التوصيل.
+
+export interface StoreWilayaOption {
+  code: number;
+  nameAr: string;
+  homePrice: number;
+  deskPrice: number;
+}
+
+export async function getStoreWilayasAction(
+  organizationId: string
+): Promise<{ source: "ecotrack" | "static"; wilayas: StoreWilayaOption[] }> {
+  const settings = await withOrgContext(organizationId, async (tx) => {
+    const [s] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, organizationId));
+    return s;
+  });
+
+  if (settings?.ecotrackApiToken && settings?.ecotrackBaseUrl) {
+    const result = await getEcotrackWilayas({
+      baseUrl: settings.ecotrackBaseUrl,
+      apiToken: settings.ecotrackApiToken,
+    });
+
+    if (result.success) {
+      // نطابق كل ولاية رجّعتها EcoTrack مع بياناتنا الثابتة لجلب الاسم العربي
+      // والسعر؛ الولايات التي ما عندها تطابق (نادر) نتجاهلها لعدم توفر سعر لها
+      const mapped = result.wilayas
+        .map((w) => {
+          const staticMatch = getWilaya(w.wilayaId);
+          if (!staticMatch) return null;
+          return {
+            code: w.wilayaId,
+            nameAr: staticMatch.name_ar,
+            homePrice: staticMatch.homePrice,
+            deskPrice: staticMatch.deskPrice,
+          };
+        })
+        .filter((w): w is StoreWilayaOption => w !== null)
+        .sort((a, b) => a.code - b.code);
+
+      if (mapped.length > 0) {
+        return { source: "ecotrack", wilayas: mapped };
+      }
+      // لو ما رجّعت مطابقات (حالة غير متوقعة)، نكمل على القائمة الثابتة أدناه
+    }
+  }
+
+  // لا يوجد حساب EcoTrack مربوط، أو فشل الجلب — نستخدم القائمة الثابتة كاحتياط
+  return {
+    source: "static",
+    wilayas: WILAYAS.map((w) => ({
+      code: w.code,
+      nameAr: w.name_ar,
+      homePrice: w.homePrice,
+      deskPrice: w.deskPrice,
+    })),
+  };
+}
+
+export interface StoreCommuneOption {
+  name: string;
+  hasStopDesk: boolean;
+}
+
+export async function getStoreCommunesAction(
+  organizationId: string,
+  wilayaCode: number
+): Promise<{ source: "ecotrack" | "static"; communes: StoreCommuneOption[] }> {
+  const settings = await withOrgContext(organizationId, async (tx) => {
+    const [s] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, organizationId));
+    return s;
+  });
+
+  if (settings?.ecotrackApiToken && settings?.ecotrackBaseUrl) {
+    const result = await getEcotrackCommunes(
+      { baseUrl: settings.ecotrackBaseUrl, apiToken: settings.ecotrackApiToken },
+      wilayaCode
+    );
+
+    if (result.success && result.communes.length > 0) {
+      return {
+        source: "ecotrack",
+        communes: result.communes
+          .map((c) => ({ name: c.name, hasStopDesk: c.hasStopDesk }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }
+  }
+
+  // احتياط: القائمة الثابتة (بدون معلومة استلام من مكتب دقيقة — نفترضها متاحة)
+  const staticWilaya = getWilaya(wilayaCode);
+  return {
+    source: "static",
+    communes: (staticWilaya?.communes ?? []).map((name) => ({ name, hasStopDesk: true })),
+  };
 }
 
 // ─── إنشاء طلب من السلة (Checkout بدون بوابة دفع إلكتروني حاليًا - دفع عند الاستلام) ──

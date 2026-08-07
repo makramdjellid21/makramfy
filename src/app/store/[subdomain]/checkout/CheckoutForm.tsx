@@ -4,11 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/hooks/useCart";
 import { formatDzd } from "@/lib/cart";
-import { WILAYAS, getWilaya, getDeliveryPrice } from "@/lib/wilayas";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
-import { createOrderAction, createOrderPaymentCheckoutAction } from "@/actions/storefront";
+import {
+  createOrderAction,
+  createOrderPaymentCheckoutAction,
+  getStoreWilayasAction,
+  getStoreCommunesAction,
+  type StoreWilayaOption,
+  type StoreCommuneOption,
+} from "@/actions/storefront";
 import { trackInitiateCheckout, trackPurchase } from "@/components/store/FacebookPixel";
 import { CheckCircle2, Truck, CreditCard, Home, Building2 } from "lucide-react";
 
@@ -35,8 +41,24 @@ export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlin
   const [success, setSuccess] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
 
-  const selectedWilaya = wilayaCode ? getWilaya(Number(wilayaCode)) : undefined;
-  const deliveryPriceDzd = wilayaCode ? getDeliveryPrice(Number(wilayaCode), deliveryType) ?? 0 : 0;
+  // قائمة الولايات: تُجلب من حساب EcoTrack الحقيقي للمتجر إن كان مربوطًا،
+  // وإلا القائمة الثابتة تلقائيًا (fallback داخل الـ action نفسه)
+  const [wilayasList, setWilayasList] = useState<StoreWilayaOption[]>([]);
+  const [wilayasLoading, setWilayasLoading] = useState(true);
+
+  // بلديات الولاية المختارة + هل كل بلدية تدعم "استلام من مكتب"
+  const [communesList, setCommunesList] = useState<StoreCommuneOption[]>([]);
+  const [communesLoading, setCommunesLoading] = useState(false);
+
+  const selectedWilaya = wilayasList.find((w) => w.code === Number(wilayaCode));
+  const selectedCommune = communesList.find((c) => c.name === commune);
+  const communeSupportsDesk = selectedCommune?.hasStopDesk ?? true;
+
+  const deliveryPriceDzd = selectedWilaya
+    ? deliveryType === "desk"
+      ? selectedWilaya.deskPrice
+      : selectedWilaya.homePrice
+    : 0;
   const deliveryPriceCents = Math.round(deliveryPriceDzd * 100);
   const totalCents = itemsTotalCents + deliveryPriceCents;
 
@@ -46,6 +68,48 @@ export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlin
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // جلب قائمة الولايات مرة وحدة عند تحميل الصفحة
+  useEffect(() => {
+    let cancelled = false;
+    setWilayasLoading(true);
+    getStoreWilayasAction(organizationId).then((res) => {
+      if (!cancelled) {
+        setWilayasList(res.wilayas);
+        setWilayasLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId]);
+
+  // جلب بلديات الولاية عند اختيارها/تغييرها
+  useEffect(() => {
+    if (!wilayaCode) {
+      setCommunesList([]);
+      return;
+    }
+    let cancelled = false;
+    setCommunesLoading(true);
+    getStoreCommunesAction(organizationId, Number(wilayaCode)).then((res) => {
+      if (!cancelled) {
+        setCommunesList(res.communes);
+        setCommunesLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, wilayaCode]);
+
+  // لو اخترنا "استلام من مكتب" وتبيّن إن البلدية ما تدعمه، نرجّع تلقائيًا لتوصيل المنزل
+  useEffect(() => {
+    if (deliveryType === "desk" && !communeSupportsDesk) {
+      setDeliveryType("home");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commune, communeSupportsDesk]);
 
   if (!ready) return null;
 
@@ -144,17 +208,18 @@ export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlin
           <div>
             <label className="text-sm font-medium text-slate-700 block mb-1">الولاية</label>
             <select
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-400"
               value={wilayaCode}
+              disabled={wilayasLoading}
               onChange={(e) => {
                 setWilayaCode(e.target.value);
                 setCommune("");
               }}
             >
-              <option value="">اختر الولاية</option>
-              {WILAYAS.map((w) => (
+              <option value="">{wilayasLoading ? "جاري التحميل..." : "اختر الولاية"}</option>
+              {wilayasList.map((w) => (
                 <option key={w.code} value={w.code}>
-                  {w.code} - {w.name_ar}
+                  {w.code} - {w.nameAr}
                 </option>
               ))}
             </select>
@@ -165,12 +230,14 @@ export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlin
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-400"
               value={commune}
               onChange={(e) => setCommune(e.target.value)}
-              disabled={!selectedWilaya}
+              disabled={!selectedWilaya || communesLoading}
             >
-              <option value="">اختر البلدية</option>
-              {selectedWilaya?.communes.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              <option value="">
+                {communesLoading ? "جاري التحميل..." : "اختر البلدية"}
+              </option>
+              {communesList.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -209,15 +276,18 @@ export function CheckoutForm({ subdomain, organizationId, themeColor, allowOnlin
             </button>
             <button
               type="button"
-              onClick={() => setDeliveryType("desk")}
-              className={`p-4 rounded-xl border-2 text-right transition-colors ${
+              onClick={() => communeSupportsDesk && setDeliveryType("desk")}
+              disabled={!communeSupportsDesk}
+              className={`p-4 rounded-xl border-2 text-right transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 deliveryType === "desk" ? "border-current" : "border-slate-200"
               }`}
               style={deliveryType === "desk" ? { borderColor: themeColor, backgroundColor: `${themeColor}0d` } : {}}
             >
               <Building2 size={18} className="mb-2" style={{ color: deliveryType === "desk" ? themeColor : "#94a3b8" }} />
               <p className="text-sm font-medium text-slate-800">استلام من المكتب</p>
-              <p className="text-xs text-slate-400 mt-0.5">{formatDzd(selectedWilaya.deskPrice * 100)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {communeSupportsDesk ? formatDzd(selectedWilaya.deskPrice * 100) : "غير متاح لهذه البلدية"}
+              </p>
             </button>
           </div>
         </div>

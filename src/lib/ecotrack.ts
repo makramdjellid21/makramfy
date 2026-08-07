@@ -138,3 +138,130 @@ export async function createEcotrackOrder(
     return { success: false, error: "تعذّر الاتصال بشركة التوصيل" };
   }
 }
+
+// ==================== جلب الولايات والبلديات المفعّلة فعليًا من EcoTrack ====================
+// كل حساب توصيل (Anderson مثلًا) عنده قائمته الخاصة من الولايات/البلديات المُفعّلة
+// وهي ليست بالضرورة كل ولايات/بلديات الجزائر. الاعتماد على قائمة ثابتة بالمشروع
+// (wilayas.ts) يسبب أخطاء "Commune mal écrite" أو "Stop desk non disponible" لأنها
+// لا تطابق قائمة الشركة الفعلية. لذلك نجيبها من EcoTrack ونعتمدها كمصدر الحقيقة
+// عند بناء نموذج الطلب (اختيار الولاية/البلدية) قبل الإرسال.
+
+export interface EcotrackWilaya {
+  wilayaId: number;
+  name: string; // بالفرنسية كما ترجعها EcoTrack
+}
+
+export interface EcotrackCommune {
+  name: string; // بالفرنسية
+  wilayaId: number;
+  postalCode: string;
+  hasStopDesk: boolean;
+}
+
+async function ecotrackGet<T>(
+  credentials: EcotrackCredentials,
+  path: string
+): Promise<{ success: true; data: T } | { success: false; error: string }> {
+  const base = normalizeBaseUrl(credentials.baseUrl);
+  if (!base || !credentials.apiToken) {
+    return { success: false, error: "بيانات حساب التوصيل غير مكتملة" };
+  }
+
+  try {
+    const res = await fetch(`${base}${path}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${credentials.apiToken}`,
+        Accept: "application/json",
+      },
+      // بيانات الولايات/البلديات تتغيّر نادرًا — كاش ساعة يكفي ويقلل عدد الطلبات
+      next: { revalidate: 3600 },
+    });
+
+    const text = await res.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("EcoTrack GET: استجابة غير JSON:", path, text.slice(0, 300));
+      return { success: false, error: "استجابة غير متوقعة من شركة التوصيل" };
+    }
+
+    if (!res.ok) {
+      console.error("EcoTrack GET error:", path, data);
+      return { success: false, error: "تعذّر جلب البيانات من شركة التوصيل" };
+    }
+
+    return { success: true, data: data as T };
+  } catch (err) {
+    console.error("EcoTrack GET request error:", path, err);
+    return { success: false, error: "تعذّر الاتصال بشركة التوصيل" };
+  }
+}
+
+/** يجيب قائمة الولايات المفعّلة فعليًا لحساب التوصيل هذا (وليست كل ولايات الجزائر) */
+export async function getEcotrackWilayas(
+  credentials: EcotrackCredentials
+): Promise<{ success: true; wilayas: EcotrackWilaya[] } | { success: false; error: string }> {
+  const result = await ecotrackGet<Array<{ wilaya_id: number; wilaya_name: string }>>(
+    credentials,
+    "/api/v1/get/wilayas"
+  );
+  if (!result.success) return result;
+
+  return {
+    success: true,
+    wilayas: result.data.map((w) => ({ wilayaId: w.wilaya_id, name: w.wilaya_name })),
+  };
+}
+
+/**
+ * يجيب قائمة البلديات المفعّلة لولاية معيّنة. كل بلدية فيها hasStopDesk —
+ * استخدمها لتعطيل خيار "استلام من مكتب" بالواجهة إذا كانت false، لتفادي
+ * خطأ "Stop desk non disponible pour cette commune" قبل حتى إرسال الطلب.
+ */
+export async function getEcotrackCommunes(
+  credentials: EcotrackCredentials,
+  wilayaId: number
+): Promise<{ success: true; communes: EcotrackCommune[] } | { success: false; error: string }> {
+  const result = await ecotrackGet<
+    Record<string, { nom: string; wilaya_id: number; code_postal: string; has_stop_desk: number }>
+  >(credentials, `/api/v1/get/communes?wilaya_id=${wilayaId}`);
+  if (!result.success) return result;
+
+  return {
+    success: true,
+    communes: Object.values(result.data).map((c) => ({
+      name: c.nom,
+      wilayaId: c.wilaya_id,
+      postalCode: c.code_postal,
+      hasStopDesk: c.has_stop_desk === 1,
+    })),
+  };
+}
+
+function normalizeArabicLatinText(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // إزالة علامات التشكيل/الأكسنت (é → e)
+    .replace(/[^a-z0-9\u0600-\u06FF]/g, ""); // إزالة المسافات والرموز
+}
+
+/**
+ * شبكة أمان إضافية وقت الشحن: طلبات قديمة (قبل ربط EcoTrack، أو من متجر بدون
+ * ربط وقتها) قد تحمل اسم بلدية بصيغة مختلفة قليلًا عن قائمة Anderson الحقيقية.
+ * نطابقها هنا بتجاهل فروقات الأكسنت/الحالة/المسافات، ونرجّع الاسم المطابق
+ * بالضبط كما تريده EcoTrack. لو ما لقى تطابق، يرجّع null.
+ */
+export function matchEcotrackCommune(customerCommune: string, activeCommunes: EcotrackCommune[]): EcotrackCommune | null {
+  const target = normalizeArabicLatinText(customerCommune);
+  if (!target) return null;
+  const exact = activeCommunes.find((c) => normalizeArabicLatinText(c.name) === target);
+  if (exact) return exact;
+  const partial = activeCommunes.find(
+    (c) => normalizeArabicLatinText(c.name).includes(target) || target.includes(normalizeArabicLatinText(c.name))
+  );
+  return partial ?? null;
+}
