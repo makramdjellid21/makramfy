@@ -6,10 +6,12 @@
  * موثّق رسميًا عبر: https://documenter.getpostman.com/view/14517169/Tz5je15g
  * Endpoint: POST {baseUrl}/api/v1/create/order
  *
- * ملاحظة مهمة: حقل "type" يتوقعه EcoTrack كرقم صحيح (integer) وليس نص.
- * القيمة 1 = توصيل عادي (Livraison) وهي الافتراضية والوحيدة المستخدمة حاليًا.
- * إذا احتجت أنواع أخرى (Pick Up / Échange / Recouvrement) لاحقًا، تأكد من
- * الأرقام الصحيحة عبر لوحة Anderson أو دعم EcoTrack قبل استخدامها.
+ * ملاحظات مهمة:
+ * 1. حقل "type" يتوقعه EcoTrack كرقم صحيح (integer) وليس نص.
+ *    القيمة 1 = توصيل عادي (Livraison) وهي الافتراضية والوحيدة المستخدمة حاليًا.
+ * 2. EcoTrack يقصّ (truncate) قيمة "reference" داخل مفتاح results بالرد أحيانًا،
+ *    فلا يمكن الاعتماد على تطابقها الحرفي الكامل مع القيمة المرسلة — لذلك نأخذ
+ *    أول عنصر داخل results مباشرة بدل البحث بالمفتاح.
  */
 
 export interface EcotrackCredentials {
@@ -18,7 +20,7 @@ export interface EcotrackCredentials {
 }
 
 export interface EcotrackOrderInput {
-  reference: string; // رقم طلبك أنت (اختياري، حتى 255 حرف)
+  reference: string; // رقم طلبك أنت (اختياري، حتى 255 حرف حسب التوثيق)
   nomClient: string;
   telephone: string;
   telephone2?: string;
@@ -103,11 +105,19 @@ export async function createEcotrackOrder(
       return { success: false, error: errorMessage };
     }
 
-    // الرد عادة يُغلَّف داخل results.{reference} — سواء نجاح أو خطأ تحقق
-    const entry = data.results?.[order.reference] as unknown;
+    if (!data.results || typeof data.results !== "object") {
+      console.error("EcoTrack: رد غير متوقع (بدون results):", data);
+      return { success: false, error: "تعذّر فهم رد شركة التوصيل" };
+    }
+
+    // EcoTrack يقصّ أحيانًا قيمة reference داخل مفتاح results، فلا نعتمد على
+    // مطابقتها الحرفية — نأخذ أولًا المطابقة الدقيقة إن وُجدت، وإلا أول عنصر متاح
+    const resultsObj = data.results;
+    const entry: unknown =
+      resultsObj[order.reference] ?? Object.values(resultsObj)[0];
 
     if (!entry || typeof entry !== "object") {
-      console.error("EcoTrack: رد غير متوقع (بدون results لهذا الـ reference):", data);
+      console.error("EcoTrack: رد غير متوقع (results فاضي):", data);
       return { success: false, error: "تعذّر فهم رد شركة التوصيل" };
     }
 
@@ -117,7 +127,9 @@ export async function createEcotrackOrder(
     }
 
     // خطأ تحقق: كائن {field: [رسائل]} — نجمعها برسالة واحدة مفهومة
-    const messages = Object.values(entry as Record<string, string[]>).flat();
+    const messages = Object.values(entry as Record<string, string[]>)
+      .flat()
+      .filter((m): m is string => typeof m === "string");
     const errorMessage = messages.length > 0 ? messages.join(" — ") : "فشل إنشاء الشحنة";
     console.error("EcoTrack validation error:", entry);
     return { success: false, error: errorMessage };
