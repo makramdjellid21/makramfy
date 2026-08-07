@@ -1,13 +1,14 @@
 "use server";
 
 import { db, withOrgContext } from "@/db";
-import { orders, memberships, customers, blockedPhones } from "@/db/schema";
+import { orders, memberships, customers, blockedPhones, storeSettings, orderItems, organizations } from "@/db/schema";
 import { eq, and, desc, count, inArray, or, isNull } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
 import type { ActionResult } from "./auth";
 import { generateId } from "@/lib/utils";
+import { createEcotrackOrder } from "@/lib/ecotrack";
 import { revalidatePath } from "next/cache";
 
 async function getMembership(userId: string, orgId: string) {
@@ -140,4 +141,64 @@ export async function updateOrderStatusAction(
 
   revalidatePath("/dashboard");
   return { success: true, data: undefined };
+}
+
+// ─── إرسال الطلب كشحنة فعلية لشركة التوصيل (Anderson / EcoTrack) ───────────────
+export async function shipOrderToEcotrackAction(
+  orgId: string,
+  orderId: string
+): Promise<ActionResult<{ trackingNumber: string }>> {
+  const user = await requireAuth();
+  const membership = await getMembership(user.id, orgId);
+  if (!membership) return { success: false, error: "غير مصرح" };
+  requirePermission(membership.role as Role, "manage_orders");
+
+  return withOrgContext(orgId, async (tx) => {
+    const [settings] = await tx.select().from(storeSettings).where(eq(storeSettings.organizationId, orgId));
+    if (!settings?.ecotrackApiToken || !settings.ecotrackBaseUrl) {
+      return { success: false, error: "لم تربط حساب شركة التوصيل بعد من الإعدادات" };
+    }
+
+    const order = await tx.query.orders.findFirst({
+      where: and(eq(orders.id, orderId), eq(orders.organizationId, orgId)),
+      with: { customer: true, items: true },
+    });
+    if (!order) return { success: false, error: "الطلب غير موجود" };
+    if (order.ecotrackTrackingNumber) {
+      return { success: false, error: "هذا الطلب مُرسل بالفعل لشركة التوصيل" };
+    }
+    if (!order.customer?.phone || !order.wilayaCode) {
+      return { success: false, error: "بيانات الطلب ناقصة (الهاتف أو الولاية)" };
+    }
+
+    const productSummary = order.items
+      .map((it) => `${it.productName} x${it.quantity}`)
+      .join(", ")
+      .slice(0, 250);
+
+    const result = await createEcotrackOrder(
+      { baseUrl: settings.ecotrackBaseUrl, apiToken: settings.ecotrackApiToken },
+      {
+        reference: order.id.slice(0, 20),
+        nomClient: order.customer.name,
+        telephone: order.customer.phone,
+        adresse: order.shippingAddress ?? "",
+        communeName: order.commune ?? "",
+        wilayaCode: order.wilayaCode,
+        montant: order.totalCents / 100,
+        produit: productSummary || "منتجات متنوعة",
+        stopDesk: order.deliveryType === "desk",
+      }
+    );
+
+    if (!result.success) return { success: false, error: result.error };
+
+    await tx
+      .update(orders)
+      .set({ ecotrackTrackingNumber: result.trackingNumber, ecotrackShippedAt: new Date(), status: "processing" })
+      .where(eq(orders.id, orderId));
+
+    revalidatePath("/dashboard");
+    return { success: true, data: { trackingNumber: result.trackingNumber } };
+  });
 }

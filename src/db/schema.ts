@@ -263,6 +263,10 @@ export const storeSettings = pgTable("store_settings", {
   // لهذا المتجر تمامًا (لا يوجد أي fallback لمفتاح مشترك، لأن أموال العملاء
   // يجب أن تصل مباشرة لحساب التاجر صاحب المتجر، وليس لحساب المنصة).
   chargilySecretKey: text("chargily_secret_key"),
+  // بيانات شركة التوصيل (EcoTrack / Anderson Delivery وما شابهها) — خاصة بكل
+  // متجر، لأن شركة التوصيل تحصّل مبلغ الدفع عند الاستلام وتحوّله لصاحب الحساب.
+  ecotrackApiToken: text("ecotrack_api_token"),
+  ecotrackBaseUrl: text("ecotrack_base_url"), // مثال: https://anderson.ecotrack.dz
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -372,6 +376,8 @@ export const orders = pgTable(
     commune: text("commune"),
     deliveryType: text("delivery_type"), // "home" | "desk"
     deliveryPriceCents: integer("delivery_price_cents").notNull().default(0),
+    ecotrackTrackingNumber: text("ecotrack_tracking_number"),
+    ecotrackShippedAt: timestamp("ecotrack_shipped_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

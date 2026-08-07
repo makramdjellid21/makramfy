@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
-import { updateOrderStatusAction, blockPhoneAction, unblockPhoneAction, getBlockedPhonesAction } from "@/actions/orders";
+import { updateOrderStatusAction, blockPhoneAction, unblockPhoneAction, getBlockedPhonesAction, shipOrderToEcotrackAction } from "@/actions/orders";
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/order-labels";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { ShoppingBag, MapPin, ShieldAlert, ShieldOff, Ban, ChevronDown } from "lucide-react";
+import { ShoppingBag, MapPin, ShieldAlert, ShieldOff, Ban, ChevronDown, Truck } from "lucide-react";
 
 interface OrderItem {
   id: string;
@@ -31,6 +31,7 @@ interface Order {
   items: OrderItem[];
   canceledCount: number;
   isBlocked: boolean;
+  ecotrackTrackingNumber: string | null;
 }
 
 interface OrdersClientProps {
@@ -59,6 +60,7 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localOrders, setLocalOrders] = useState(orders);
   const [blockBusyPhone, setBlockBusyPhone] = useState<string | null>(null);
+  const [shipBusyId, setShipBusyId] = useState<string | null>(null);
 
   const canManage = hasPermission(myRole as Role, "manage_orders");
 
@@ -83,6 +85,21 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
       return;
     }
     setLocalOrders((prev) => prev.map((o) => (o.customer?.phone === phone ? { ...o, isBlocked: true } : o)));
+  }
+
+  async function handleShip(orderId: string) {
+    setShipBusyId(orderId);
+    const result = await shipOrderToEcotrackAction(orgId, orderId);
+    setShipBusyId(null);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setLocalOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? { ...o, ecotrackTrackingNumber: result.data.trackingNumber, status: "processing" } : o
+      )
+    );
   }
 
   return (
@@ -183,6 +200,22 @@ export function OrdersClient({ orgId, orders, myRole }: OrdersClientProps) {
                       {ORDER_STATUS_LABELS[order.status] ?? order.status}
                     </Badge>
                   )}
+                  {canManage &&
+                    (order.ecotrackTrackingNumber ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-1" dir="ltr">
+                        <Truck size={11} />
+                        {order.ecotrackTrackingNumber}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleShip(order.id)}
+                        disabled={shipBusyId === order.id}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 border border-blue-200 rounded-full px-2.5 py-1 hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        <Truck size={11} />
+                        {shipBusyId === order.id ? "جارٍ الإرسال..." : "إرسال لشركة التوصيل"}
+                      </button>
+                    ))}
                 </div>
               </div>
 

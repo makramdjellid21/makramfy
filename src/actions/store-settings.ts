@@ -53,6 +53,8 @@ export async function updateStoreSettingsAction(
   const telegramChatId = (formData.get("telegramChatId") as string)?.trim();
   const facebookPixelId = (formData.get("facebookPixelId") as string)?.trim();
   const chargilySecretKey = (formData.get("chargilySecretKey") as string)?.trim();
+  const ecotrackApiToken = (formData.get("ecotrackApiToken") as string)?.trim();
+  const ecotrackBaseUrl = (formData.get("ecotrackBaseUrl") as string)?.trim();
 
   const values = {
     description: description || null,
@@ -74,6 +76,8 @@ export async function updateStoreSettingsAction(
     telegramChatId: telegramChatId || null,
     facebookPixelId: facebookPixelId || null,
     chargilySecretKey: chargilySecretKey || null,
+    ecotrackApiToken: ecotrackApiToken || null,
+    ecotrackBaseUrl: ecotrackBaseUrl || null,
     updatedAt: new Date(),
   };
 

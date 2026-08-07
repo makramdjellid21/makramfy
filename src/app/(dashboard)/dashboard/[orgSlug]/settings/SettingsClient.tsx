@@ -14,7 +14,7 @@ import {
 } from "@/actions/store-settings";
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
-import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText, CreditCard, CheckCircle2 } from "lucide-react";
+import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText, CreditCard, CheckCircle2, Truck } from "lucide-react";
 
 interface Org {
   id: string;
@@ -43,6 +43,8 @@ interface Settings {
   telegramChatId: string | null;
   facebookPixelId: string | null;
   chargilySecretKey: string | null;
+  ecotrackApiToken: string | null;
+  ecotrackBaseUrl: string | null;
 }
 
 interface SettingsClientProps {
@@ -80,6 +82,8 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [telegramChatId, setTelegramChatId] = useState(settings?.telegramChatId ?? "");
   const [facebookPixelId, setFacebookPixelId] = useState(settings?.facebookPixelId ?? "");
   const [chargilySecretKey, setChargilySecretKey] = useState(settings?.chargilySecretKey ?? "");
+  const [ecotrackApiToken, setEcotrackApiToken] = useState(settings?.ecotrackApiToken ?? "");
+  const [ecotrackBaseUrl, setEcotrackBaseUrl] = useState(settings?.ecotrackBaseUrl ?? "");
   const [isPublished, setIsPublished] = useState(settings?.isPublished ?? false);
 
   const [savingGeneral, setSavingGeneral] = useState(false);
@@ -116,6 +120,8 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
     formData.set("telegramChatId", telegramChatId.trim());
     formData.set("facebookPixelId", facebookPixelId.trim());
     formData.set("chargilySecretKey", chargilySecretKey.trim());
+    formData.set("ecotrackApiToken", ecotrackApiToken.trim());
+    formData.set("ecotrackBaseUrl", ecotrackBaseUrl.trim());
     return formData;
   }
 
@@ -521,6 +527,54 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
         {canEdit && (
           <Button onClick={() => handleSaveSection("payment", "تم حفظ إعدادات الدفع")} loading={savingSection === "payment"}>
+            حفظ
+          </Button>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Truck size={18} className="text-blue-600" />
+          <h2 className="text-lg font-semibold text-slate-900">شركة التوصيل (Anderson / EcoTrack)</h2>
+        </div>
+
+        {ecotrackApiToken ? (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium rounded-xl px-3 py-2.5">
+            <CheckCircle2 size={14} />
+            حساب التوصيل مربوط — الشحنات تُنشأ باسم حسابك أنت مباشرة
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-xl px-3 py-2.5 leading-relaxed">
+            بدون هذا، ما نقدر ننشئ شحنات تلقائيًا لطلباتك عبر Anderson.
+          </div>
+        )}
+
+        <p className="text-xs text-slate-500 leading-relaxed">
+          من لوحة تحكم Anderson (أو أي شركة تعمل عبر EcoTrack) اذهب لقسم <span className="font-medium">API</span> وانسخ
+          الرمز (Token)، وألصق رابط حسابك الأساسي (Base URL) — عادة يشبه <span dir="ltr" className="font-mono">https://اسم-الشركة.ecotrack.dz</span>.
+        </p>
+
+        <Input
+          label="رابط الحساب (Base URL)"
+          placeholder="https://anderson.ecotrack.dz"
+          value={ecotrackBaseUrl}
+          onChange={(e) => setEcotrackBaseUrl(e.target.value)}
+          disabled={!canEdit}
+          dir="ltr"
+        />
+
+        <Input
+          label="API Token"
+          placeholder="الرمز من لوحة Anderson"
+          type="password"
+          value={ecotrackApiToken}
+          onChange={(e) => setEcotrackApiToken(e.target.value)}
+          disabled={!canEdit}
+          dir="ltr"
+        />
+
+        {canEdit && (
+          <Button onClick={() => handleSaveSection("payment", "تم حفظ إعدادات التوصيل")} loading={savingSection === "payment"}>
             حفظ
           </Button>
         )}
