@@ -488,6 +488,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
       {/* الدفع الإلكتروني */}
       {activeTab === "payment" && (
+      <>
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <CreditCard size={18} className="text-emerald-600" />
@@ -579,6 +580,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </Button>
         )}
       </div>
+      </>
       )}
 
       {/* منطقة الخطر */}
