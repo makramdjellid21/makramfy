@@ -5,6 +5,11 @@
  *
  * موثّق رسميًا عبر: https://documenter.getpostman.com/view/14517169/Tz5je15g
  * Endpoint: POST {baseUrl}/api/v1/create/order
+ *
+ * ملاحظة مهمة: حقل "type" يتوقعه EcoTrack كرقم صحيح (integer) وليس نص.
+ * القيمة 1 = توصيل عادي (Livraison) وهي الافتراضية والوحيدة المستخدمة حاليًا.
+ * إذا احتجت أنواع أخرى (Pick Up / Échange / Recouvrement) لاحقًا، تأكد من
+ * الأرقام الصحيحة عبر لوحة Anderson أو دعم EcoTrack قبل استخدامها.
  */
 
 export interface EcotrackCredentials {
@@ -26,7 +31,11 @@ export interface EcotrackOrderInput {
   stopDesk: boolean; // true = استلام من مكتب، false = توصيل للمنزل
   weight?: number;
   fragile?: boolean;
-  type?: "Livraison" | "Pick UP" | "Échange" | "Recouvrement";
+  /**
+   * رمز نوع الشحنة كرقم صحيح يتوقعه EcoTrack. افتراضيًا 1 (توصيل عادي).
+   * تأكد من القيم الصحيحة للأنواع الأخرى قبل استخدامها.
+   */
+  typeCode?: number;
 }
 
 function normalizeBaseUrl(url: string): string {
@@ -54,7 +63,7 @@ export async function createEcotrackOrder(
     montant: String(order.montant),
     remarque: order.remarque ?? "",
     produit: order.produit,
-    type: order.type ?? "Livraison",
+    type: String(order.typeCode ?? 1), // 1 = Livraison (توصيل عادي) — يجب أن يكون رقمًا صحيحًا
     stop_desk: order.stopDesk ? "1" : "0",
     weight: order.weight ? String(order.weight) : "",
     fragile: order.fragile ? "1" : "0",
@@ -84,8 +93,8 @@ export async function createEcotrackOrder(
       return { success: false, error: "استجابة غير متوقعة من شركة التوصيل" };
     }
 
-    // بعض أخطاء التحقق (مثل اسم بلدية غير صحيح) ترجع مباشرة بالمستوى الأعلى
-    // {message, errors} بدون تغليف داخل results
+    // بعض أخطاء التحقق (مثل اسم بلدية غير صحيح، أو حقل type) ترجع مباشرة
+    // بالمستوى الأعلى {message, errors} بدون تغليف داخل results
     if (!data.results && (data.message || data.errors)) {
       const fieldMessages = data.errors ? Object.values(data.errors).flat() : [];
       const errorMessage =
