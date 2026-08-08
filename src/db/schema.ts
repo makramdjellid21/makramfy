@@ -267,6 +267,7 @@ export const storeSettings = pgTable("store_settings", {
   // متجر، لأن شركة التوصيل تحصّل مبلغ الدفع عند الاستلام وتحوّله لصاحب الحساب.
   ecotrackApiToken: text("ecotrack_api_token"),
   ecotrackBaseUrl: text("ecotrack_base_url"), // مثال: https://anderson.ecotrack.dz
+  ecotrackCourierName: text("ecotrack_courier_name"), // للعرض فقط (شارة بلوحة التحكم)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

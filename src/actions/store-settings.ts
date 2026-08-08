@@ -55,6 +55,7 @@ export async function updateStoreSettingsAction(
   const chargilySecretKey = (formData.get("chargilySecretKey") as string)?.trim();
   const ecotrackApiToken = (formData.get("ecotrackApiToken") as string)?.trim();
   const ecotrackBaseUrl = (formData.get("ecotrackBaseUrl") as string)?.trim();
+  const ecotrackCourierName = (formData.get("ecotrackCourierName") as string)?.trim();
 
   const values = {
     description: description || null,
@@ -78,6 +79,7 @@ export async function updateStoreSettingsAction(
     chargilySecretKey: chargilySecretKey || null,
     ecotrackApiToken: ecotrackApiToken || null,
     ecotrackBaseUrl: ecotrackBaseUrl || null,
+    ecotrackCourierName: ecotrackCourierName || null,
     updatedAt: new Date(),
   };
 

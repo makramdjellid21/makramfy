@@ -15,6 +15,7 @@ import {
 import { hasPermission } from "@/lib/permissions";
 import type { Role } from "@/lib/permissions";
 import { ExternalLink, Globe, Send, BarChart3, Megaphone, FileText, CreditCard, CheckCircle2, Truck } from "lucide-react";
+import { ECOTRACK_COURIERS } from "@/lib/ecotrack-couriers";
 
 interface Org {
   id: string;
@@ -45,6 +46,7 @@ interface Settings {
   chargilySecretKey: string | null;
   ecotrackApiToken: string | null;
   ecotrackBaseUrl: string | null;
+  ecotrackCourierName: string | null;
 }
 
 interface SettingsClientProps {
@@ -84,6 +86,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
   const [chargilySecretKey, setChargilySecretKey] = useState(settings?.chargilySecretKey ?? "");
   const [ecotrackApiToken, setEcotrackApiToken] = useState(settings?.ecotrackApiToken ?? "");
   const [ecotrackBaseUrl, setEcotrackBaseUrl] = useState(settings?.ecotrackBaseUrl ?? "");
+  const [ecotrackCourierName, setEcotrackCourierName] = useState(settings?.ecotrackCourierName ?? "");
   const [isPublished, setIsPublished] = useState(settings?.isPublished ?? false);
 
   const [savingGeneral, setSavingGeneral] = useState(false);
@@ -122,6 +125,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
     formData.set("chargilySecretKey", chargilySecretKey.trim());
     formData.set("ecotrackApiToken", ecotrackApiToken.trim());
     formData.set("ecotrackBaseUrl", ecotrackBaseUrl.trim());
+    formData.set("ecotrackCourierName", ecotrackCourierName.trim());
     return formData;
   }
 
@@ -536,7 +540,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
       <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
         <div className="flex items-center gap-2">
           <Truck size={18} className="text-blue-600" />
-          <h2 className="text-lg font-semibold text-slate-900">شركة التوصيل (Anderson / EcoTrack)</h2>
+          <h2 className="text-lg font-semibold text-slate-900">شركة التوصيل</h2>
         </div>
 
         {ecotrackApiToken ? (
@@ -546,14 +550,36 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
           </div>
         ) : (
           <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-xl px-3 py-2.5 leading-relaxed">
-            بدون هذا، ما نقدر ننشئ شحنات تلقائيًا لطلباتك عبر Anderson.
+            بدون هذا، ما نقدر ننشئ شحنات تلقائيًا لطلباتك.
           </div>
         )}
 
         <p className="text-xs text-slate-500 leading-relaxed">
-          من لوحة تحكم Anderson (أو أي شركة تعمل عبر EcoTrack) اذهب لقسم <span className="font-medium">API</span> وانسخ
-          الرمز (Token)، وألصق رابط حسابك الأساسي (Base URL) — عادة يشبه <span dir="ltr" className="font-mono">https://اسم-الشركة.ecotrack.dz</span>.
+          ندعم أكثر من 37 شركة توصيل جزائرية تعمل على نظام EcoTrack المشترك (Anderson، DHD، Speed Delivery،
+          Rocket Delivery وغيرها). من لوحة تحكم شركتك اذهب لقسم <span className="font-medium">API</span> وانسخ
+          الرمز (Token) ورابط حسابك (Base URL) — عادة يشبه <span dir="ltr" className="font-mono">https://اسم-الشركة.ecotrack.dz</span>.
         </p>
+
+        <div>
+          <label className="text-sm font-medium text-slate-700 block mb-1.5">شركة التوصيل</label>
+          <select
+            value={ecotrackCourierName}
+            onChange={(e) => setEcotrackCourierName(e.target.value)}
+            disabled={!canEdit}
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-100 bg-white"
+          >
+            <option value="">اختر شركتك...</option>
+            {ECOTRACK_COURIERS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            <option value="أخرى">أخرى (شركة تعمل عبر EcoTrack)</option>
+          </select>
+          <p className="text-xs text-slate-400 mt-1">
+            هذا للعرض فقط — رابط حسابك وتوكنك الحقيقيين من شركتك هما اللي يحددان أي شركة تشحن طلباتك فعليًا.
+          </p>
+        </div>
 
         <Input
           label="رابط الحساب (Base URL)"
@@ -566,7 +592,7 @@ export function SettingsClient({ orgId, org, settings, myRole, storeUrl }: Setti
 
         <Input
           label="API Token"
-          placeholder="الرمز من لوحة Anderson"
+          placeholder="الرمز من لوحة شركة التوصيل"
           type="password"
           value={ecotrackApiToken}
           onChange={(e) => setEcotrackApiToken(e.target.value)}
