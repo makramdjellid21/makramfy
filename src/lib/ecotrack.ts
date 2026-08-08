@@ -87,12 +87,20 @@ export async function createEcotrackOrder(
       results?: Record<string, unknown>;
       message?: string;
       errors?: Record<string, string[]>;
+      success?: unknown;
+      tracking?: unknown;
     };
     try {
       data = JSON.parse(text);
     } catch {
       console.error("EcoTrack: استجابة غير JSON:", text.slice(0, 300));
       return { success: false, error: "استجابة غير متوقعة من شركة التوصيل" };
+    }
+
+    // النجاح أحيانًا يرجع مسطّحًا مباشرة بالمستوى الأعلى (بدون تغليف داخل
+    // results إطلاقًا): {success: true, tracking: "...", reference: "..."}
+    if (data.success === true && typeof data.tracking === "string") {
+      return { success: true, trackingNumber: data.tracking };
     }
 
     // بعض أخطاء التحقق (مثل اسم بلدية غير صحيح، أو حقل type) ترجع مباشرة
