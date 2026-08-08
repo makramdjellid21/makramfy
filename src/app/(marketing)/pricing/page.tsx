@@ -1,58 +1,14 @@
 import Link from "next/link";
 import { Check, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { PLAN_LIMITS } from "@/lib/plans";
-import { formatBytes } from "@/lib/utils";
+import { PLAN_MARKETING_DETAILS, PLAN_ORDER } from "@/lib/plans";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function PricingPage() {
   const user = await getCurrentUser();
   const ctaHref = user ? "/dashboard" : "/register";
 
-  const plans = [
-    {
-      key: "free",
-      ...PLAN_LIMITS.free,
-      popular: false,
-      description: "مثالي للانطلاقة الأولى وتجربة المنصة بدون أي التزام.",
-      features: [
-        `عضو واحد`,
-        `${PLAN_LIMITS.free.maxProducts} منتج كحد أقصى`,
-        `${formatBytes(PLAN_LIMITS.free.maxStorageBytes)} مساحة تخزين`,
-        "الدفع عند الاستلام",
-        "لوحة تحكم كاملة",
-        "شعار \"مبني عبر MakramFy\" ظاهر بالمتجر",
-      ],
-    },
-    {
-      key: "pro",
-      ...PLAN_LIMITS.pro,
-      popular: true,
-      description: "للتجار الجادين اللي يبيعون بشكل يومي ومحتاجين فريق صغير.",
-      features: [
-        `حتى ${PLAN_LIMITS.pro.maxMembers} أعضاء في الفريق`,
-        "منتجات غير محدودة",
-        `${formatBytes(PLAN_LIMITS.pro.maxStorageBytes)} مساحة تخزين`,
-        "الدفع عند الاستلام + دفع أونلاين (EDAHABIA/CIB)",
-        "بدون شعار MakramFy — علامتك التجارية فقط",
-        "ألوان ومتغيرات منتج (لون، مقاس...) غير محدودة",
-      ],
-    },
-    {
-      key: "business",
-      ...PLAN_LIMITS.business,
-      popular: false,
-      description: "للمتاجر الكبيرة والفرق متعددة الأعضاء اللي تدير عدة أشخاص.",
-      features: [
-        "أعضاء غير محدودين في الفريق",
-        "منتجات غير محدودة",
-        `${formatBytes(PLAN_LIMITS.business.maxStorageBytes)} مساحة تخزين`,
-        "الدفع عند الاستلام + دفع أونلاين (EDAHABIA/CIB)",
-        "بدون شعار MakramFy",
-        "صلاحيات فريق متقدمة (مالك، مدير، عضو)",
-      ],
-    },
-  ];
+  const plans = PLAN_ORDER.map((key) => PLAN_MARKETING_DETAILS[key]);
 
   return (
     <div className="py-20">

@@ -1,3 +1,5 @@
+import { formatBytes } from "./utils";
+
 export type Plan = "free" | "pro" | "business";
 
 export interface PlanLimits {
@@ -57,3 +59,63 @@ export function getUpgradeMessage(resource: "member" | "storage" | "product", pl
   };
   return messages[resource] + " يرجى ترقية خطتك للمتابعة.";
 }
+
+// ─── تفاصيل تسويقية موحّدة (تُستخدم بصفحة الأسعار العامة وصفحة الفوترة بالداشبورد) ──
+export interface PlanMarketingDetails {
+  key: Plan;
+  label: string;
+  price: number;
+  popular: boolean;
+  description: string;
+  features: string[];
+}
+
+export const PLAN_ORDER: Plan[] = ["free", "pro", "business"];
+
+export const PLAN_MARKETING_DETAILS: Record<Plan, PlanMarketingDetails> = {
+  free: {
+    key: "free",
+    label: PLAN_LIMITS.free.label,
+    price: PLAN_LIMITS.free.price,
+    popular: false,
+    description: "مثالي للانطلاقة الأولى وتجربة المنصة بدون أي التزام.",
+    features: [
+      "عضو واحد",
+      `${PLAN_LIMITS.free.maxProducts} منتج كحد أقصى`,
+      `${formatBytes(PLAN_LIMITS.free.maxStorageBytes)} مساحة تخزين`,
+      "الدفع عند الاستلام",
+      "لوحة تحكم كاملة",
+      'شعار "مبني عبر MakramFy" ظاهر بالمتجر',
+    ],
+  },
+  pro: {
+    key: "pro",
+    label: PLAN_LIMITS.pro.label,
+    price: PLAN_LIMITS.pro.price,
+    popular: true,
+    description: "للتجار الجادين اللي يبيعون بشكل يومي ومحتاجين فريق صغير.",
+    features: [
+      `حتى ${PLAN_LIMITS.pro.maxMembers} أعضاء في الفريق`,
+      "منتجات غير محدودة",
+      `${formatBytes(PLAN_LIMITS.pro.maxStorageBytes)} مساحة تخزين`,
+      "الدفع عند الاستلام + دفع أونلاين (EDAHABIA/CIB)",
+      "بدون شعار MakramFy — علامتك التجارية فقط",
+      "ألوان ومتغيرات منتج (لون، مقاس...) غير محدودة",
+    ],
+  },
+  business: {
+    key: "business",
+    label: PLAN_LIMITS.business.label,
+    price: PLAN_LIMITS.business.price,
+    popular: false,
+    description: "للمتاجر الكبيرة والفرق متعددة الأعضاء اللي تدير عدة أشخاص.",
+    features: [
+      "أعضاء غير محدودين في الفريق",
+      "منتجات غير محدودة",
+      `${formatBytes(PLAN_LIMITS.business.maxStorageBytes)} مساحة تخزين`,
+      "الدفع عند الاستلام + دفع أونلاين (EDAHABIA/CIB)",
+      "بدون شعار MakramFy",
+      "صلاحيات فريق متقدمة (مالك، مدير، عضو)",
+    ],
+  },
+};

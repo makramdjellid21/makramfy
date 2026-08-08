@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { createSubscriptionCheckoutAction } from "@/actions/billing";
-import { PLAN_LIMITS } from "@/lib/plans";
-import { formatBytes } from "@/lib/utils";
+import { PLAN_MARKETING_DETAILS, PLAN_ORDER } from "@/lib/plans";
 import { Check, Zap } from "lucide-react";
 
 interface BillingClientProps {
@@ -44,40 +43,7 @@ export function BillingClient({
     }
   }
 
-  const planDetails = [
-    {
-      key: "free",
-      label: "مجاني",
-      price: PLAN_LIMITS.free.price,
-      features: [
-        `${PLAN_LIMITS.free.maxMembers} أعضاء`,
-        `${formatBytes(PLAN_LIMITS.free.maxStorageBytes)} تخزين`,
-        `${PLAN_LIMITS.free.maxProducts} منتجات`,
-      ],
-    },
-    {
-      key: "pro",
-      label: "احترافي",
-      price: PLAN_LIMITS.pro.price,
-      features: [
-        `${PLAN_LIMITS.pro.maxMembers} أعضاء`,
-        `${formatBytes(PLAN_LIMITS.pro.maxStorageBytes)} تخزين`,
-        "منتجات غير محدودة",
-        "دعم بالأولوية",
-      ],
-    },
-    {
-      key: "business",
-      label: "أعمال",
-      price: PLAN_LIMITS.business.price,
-      features: [
-        "أعضاء غير محدودين",
-        `${formatBytes(PLAN_LIMITS.business.maxStorageBytes)} تخزين`,
-        "منتجات غير محدودة",
-        "دعم 24/7",
-      ],
-    },
-  ];
+  const planDetails = PLAN_ORDER.map((key) => PLAN_MARKETING_DETAILS[key]);
 
   const statusBadge: Record<string, { label: string; variant: "success" | "warning" | "danger" | "default" }> = {
     active: { label: "نشط", variant: "success" },
@@ -153,6 +119,7 @@ export function BillingClient({
                   <p className="text-xs font-bold text-violet-600 uppercase mb-2">الأكثر شعبية</p>
                 )}
                 <h3 className="text-lg font-bold text-slate-900">{p.label}</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed min-h-[2rem]">{p.description}</p>
                 <div className="flex items-baseline gap-1 my-3">
                   <span className="text-4xl font-bold text-slate-900">
                     {p.price.toLocaleString("ar-DZ")}
